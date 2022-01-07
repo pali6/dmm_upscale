@@ -1,0 +1,24 @@
+[package]
+name = "maprust"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "maprust"
+path = "src/main.rs"
+
+[dependencies]
+ndarray = "0.15.4"
+
+[dependencies.dreammaker]
+git = "https://github.com/SpaceManiac/SpacemanDMM"
+rev = "0ec49aa113d2107161e273fc8fd66322761d084c"
+package = "dreammaker"
+
+[dependencies.dmmtools]
+git = "https://github.com/SpaceManiac/SpacemanDMM"
+rev = "0ec49aa113d2107161e273fc8fd66322761d084c"
+package = "dmm-tools"
+
+[profile.release]
+lto = true
