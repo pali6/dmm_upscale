@@ -140,6 +140,24 @@ lazy_static! {
 	);
 }
 
+lazy_static! {
+	pub static ref BIG_TILE_UPSCALE_TURF: BigTileTemplate = big_tile_template!(
+		Source, Source,
+		big_tile_modification_fun!(prefab,
+			"transform" => Constant::List(Box::new([
+				(Constant::Float(2.), None),
+				(Constant::Float(0.), None),
+				(Constant::Float(TILE_SIZE / 2.), None),
+				
+				(Constant::Float(0.), None),
+				(Constant::Float(2.), None),
+				(Constant::Float(TILE_SIZE / 2.), None),
+			])),
+			"layer" => Constant::Float(2.1)
+		), Source
+	);
+}
+
 pub fn big_tile_upscale_dynamic(prefab: &Prefab, objtree: &ObjectTree) -> BigTileTemplate {
 	let bound_width = get_var(prefab, objtree, "bound_width").and_then(Constant::to_float).unwrap_or(TILE_SIZE);
 	let bound_height = get_var(prefab, objtree, "bound_height").and_then(Constant::to_float).unwrap_or(TILE_SIZE);

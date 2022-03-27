@@ -285,6 +285,8 @@ fn main() {
 				["obj", "machinery", "cargo_router", ..] | // TODO
 				["obj", "machinery", "power", ..] =>
 					BIG_TILE_FILL.clone(),
+				["turf", "simulated", "wall", "auto", "shuttle", ..] =>
+					BIG_TILE_UPSCALE_TURF.clone(),
 				["obj", "machinery", ..] |
 				["obj", "shrub", ..] |
 				["obj", "submachine", ..] |
@@ -298,7 +300,6 @@ fn main() {
 				["obj", "decal", "poster", ..] |
 				["obj", "effects", "background_objects", ..] |
 				["obj", "tree1", ..] |
-				["turf", "simulated", "wall", "auto", "shuttle", ..] |
 				["obj", "indestructible", ..] |
 				["obj", "barber_pole", ..] |
 				["obj", "securearea", ..] |
