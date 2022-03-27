@@ -1,17 +1,29 @@
 extern crate dreammaker as dm;
 extern crate dmmtools;
 
+mod bigtile;
+mod dir;
+mod wipmap;
+mod coord;
+
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::str;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+use dm::Context;
 use ndarray::{self, Array2};
 
-use dm::constants::Constant;
+use dm::constants::{Constant, ConstFn};
 use dm::objtree::ObjectTree;
-use dmmtools::dmm;
+use dmmtools::dmm::{self, Coord3, Map, Coord2};
 use dmmtools::dmm::Prefab;
+
+use bigtile::*;
+use wipmap::{WipMap};
+use dir::Dir;
+use coord::*;
 
 fn get_var<'a>(prefab: &'a Prefab, objtree: &'a ObjectTree, key: &str) -> Option<&'a Constant> {
 	if let Some(v) = prefab.vars.get(key) {
@@ -27,116 +39,281 @@ fn get_var<'a>(prefab: &'a Prefab, objtree: &'a ObjectTree, key: &str) -> Option
 	None
 }
 
-type WipMap = Array2<Vec<Prefab>>;
-
-enum BigTilePart<'a> {
-	FixedPrefab(Prefab),
-	Source,
-	ModifiedSource(&'a [(&'a str, Constant)]),
+fn get_pixel_shift(prefab: &Prefab, objtree: &ObjectTree) -> Option<(f32, f32)> {
+	let x = get_var(prefab, objtree, "pixel_x").unwrap_or(&Constant::Float(0.));
+	let y = get_var(prefab, objtree, "pixel_y").unwrap_or(&Constant::Float(0.));
+	match (x, y) {
+		(&Constant::Float(x), &Constant::Float(y)) => Some((x, y)),
+		_ => None,
+	}
 }
 
-struct BigTileTemplate<'a> {
-	parts: [&'a [&'a BigTilePart<'a>]; 4],
+fn find_neighbor<F>(map: &Map, coord: Coord3, check: F) -> Option<Dir> 
+	where F: Fn(&Prefab) -> bool {
+	find_neighbor_dir_filter(map, coord, |x, _| check(x))
 }
 
-macro_rules! big_tile_template {
-	($p1:expr, $p2:expr, $p3:expr, $p4:expr) => {
-		BigTileTemplate {
-			parts: [
-				&[&$p1],
-				&[&$p2],
-				&[&$p3],
-				&[&$p4],
-			],
+fn find_neighbor_dir_filter<F>(map: &Map, coord: Coord3, check: F) -> Option<Dir> 
+	where F: Fn(&Prefab, Dir) -> bool {
+	let (width, height, _) = map.dim_xyz();
+	for dir in dir::CARDINAL_DIRS {
+		let new_coord = dir.shift_coord(coord);
+		if new_coord.x < 1 || new_coord.y < 1 || new_coord.x > width as i32 || new_coord.y > height as i32 {
+			continue;
 		}
-	};
-}
-
-const BIG_TILE_FILL: BigTileTemplate = big_tile_template!(
-	BigTilePart::Source, 	BigTilePart::Source,
-	BigTilePart::Source, 	BigTilePart::Source
-);
-
-const BIG_TILE_SHIFTS: [(usize, usize); 4] = [
-	(0, 1), (1, 1),
-	(0, 0), (1, 0),
-];
-
-fn apply_big_tile(out_map: &mut WipMap, big_tile: &BigTileTemplate, objtree: &ObjectTree, prefab: &Prefab, coords: (usize, usize)) {
-	let (bigx, bigy) = (coords.0 * 2, coords.1 * 2);
-	for ((dx, dy), &part_list) in BIG_TILE_SHIFTS.iter().zip(&big_tile.parts) {
-		let x = bigx + dx;
-		let y = bigy + dy;
-		for &part in part_list {
-			out_map.get_mut((x, y)).unwrap().push(match part {
-				BigTilePart::FixedPrefab(p) => p.clone(),
-				BigTilePart::Source => prefab.clone(),
-				BigTilePart::ModifiedSource(vars) => {
-					let mut p = prefab.clone();
-					for (key, value) in vars.iter() {
-						p.vars.insert(key.to_string(), value.clone());
-					}
-					p
-				}
-			});
+		for prefab in map.dictionary.get(&map[new_coord]).unwrap_or(&vec![]) {
+			if check(prefab, dir) {
+				return Some(dir);
+			}
 		}
 	}
+	None
 }
 
-fn normalize_tile(tile: &mut Vec<Prefab>) {
-	for p in tile.iter_mut() {
-		p.vars.sort_keys();
-	}
-	tile.sort_by_key(|p| {
-		let mut hasher = DefaultHasher::new();
-		p.hash(&mut hasher);
-		hasher.finish()
-	});
-}
-
-fn finish_map(in_map: &mut WipMap) -> Result<dmm::Map, &'static str> {
-	let mut out_map = dmm::Map::new(in_map.ncols(), in_map.nrows(), 1, "/turf".to_string(), "/area".to_string());
-	let mut key  = out_map.dictionary.keys().next().unwrap().clone(); // sorta hacky way to get the first key
-	let mut tile_to_key = HashMap::new();
-	for tile in in_map.iter_mut() {
-		normalize_tile(tile);
-	}
-	for tile in in_map.iter() {
-		if !tile_to_key.contains_key(tile) {
-			tile_to_key.insert(tile, key);
-			out_map.dictionary.insert(key, tile.clone());
-			key = key.next();
-		}
-	}
-	for ((x, y), tile) in in_map.indexed_iter() {
-		let key = tile_to_key[tile];
-		out_map.grid[(0, y, x)] = key;
-	}
-	out_map.adjust_key_length();
-	Ok(out_map)
+fn split_path<'a>(path: &'a String) -> Vec<&'a str> {
+	path.split("/").collect::<Vec<_>>()
 }
 
 fn main() {
-	let map = dmm::Map::from_file(r"..\..\goonstation\maps\atlas.dmm".as_ref());
+	println!("begin");
+	let map = dmm::Map::from_file(r"..\..\goonstation\maps\cogmap.dmm".as_ref());
 	let map = map.unwrap();
 	
-	//let objtree = Context::default().parse_environment(r"..\..\goonstation\goonstation.dme".as_ref());
-	//let objtree = objtree.unwrap();
-	let objtree = ObjectTree::default();
+	let objtree = Context::default().parse_environment(r"..\..\goonstation\goonstation.dme".as_ref());
+	let objtree = objtree.unwrap();
+	//let objtree = ObjectTree::default();
 
 	let (width, height, z_level_count) = map.dim_xyz();
 	assert!(z_level_count == 1); // TODO
 
-	let mut out_map : WipMap = ndarray::Array2::from_elem((2 * width, 2 * height), Vec::new());
+	let mut out_map : WipMap = WipMap::new(2 * width, 2 * height);
 
-	for ((_, y, x), key) in map.grid.indexed_iter() {
+	for ((z, y, x), key) in map.grid.indexed_iter() {
+		let coord = coord_from_raw((z, y, x), map.grid.dim());
 		let prefabs = &map.dictionary[key];
-		let big_tile = BIG_TILE_FILL;
 		for prefab in prefabs {
-			apply_big_tile(&mut out_map, &big_tile, &objtree, &prefab, (x, y));
+			let path = split_path(&prefab.path);
+			let path = &path.as_slice()[1..];
+			let mut mut_prefab = prefab.clone();
+			let solid_neigh = find_neighbor(&map, coord, |prefab|
+				prefab.path.starts_with("/turf/simulated/wall") ||
+				prefab.path.starts_with("/obj/wingrille_spawn") ||
+				prefab.path.starts_with("/obj/window") ||
+				prefab.path.starts_with("/obj/machinery/door")
+			);
+			let dir = get_var(prefab, &objtree, "dir")
+				.and_then(|x| dir::Dir::try_from(x).ok());
+
+			let big_tile: BigTileTemplate = match path {
+				["obj", "machinery", "light", "small", "floor", ..] => 
+					BIG_TILE_FILL.clone(),
+				["obj", "xmastree", ..] |
+				["obj", "landmark", "gps_waypoint", ..] |
+				["obj", "machinery", "networked", "mainframe", ..] |
+				["obj", "landmark", "map", ..] |
+				["obj", "item", "device", "radio", "beacon", ..] |
+				["obj", "voting_box", ..] |
+				["obj", "machinery", "vehicle", "pod_smooth", ..] |
+				["obj", "machinery", "navbeacon", ..] => 
+					BIG_TILE_JUST_BOTTOM_LEFT.clone(),
+				["obj", "decal", "fakeobjects", "airmonitor_broken", ..] |
+				["obj", "machinery", "sparker", ..] |
+				["obj", "machinery", "light_switch", "auto", ..] => {
+					solid_neigh
+					.and_then(|x| Some(big_tile_two_on_side(x)))
+					.unwrap_or(BIG_TILE_FILL.clone())
+				}
+				["obj", "airbridge_controller", ..] => {
+					let tunnel_width = get_var(prefab, &objtree, "tunnel_width")
+						.and_then(Constant::to_float)
+						.unwrap_or(0.);
+					mut_prefab.vars.insert("tunnel_width".to_string(), Constant::Float(tunnel_width * 2.));
+					solid_neigh
+					.and_then(|x| Some(big_tile_one_on_side_biased(x)))
+					.unwrap_or(BIG_TILE_FILL.clone())
+				}
+				["obj", "machinery", "drone_recharger", ..] => 
+					big_tile_two_on_side(dir::Dir::North),
+				["obj", "stool", "chair", "couch", ..] => {
+					match dir {
+						Some(Dir::North) | Some(Dir::South) => big_tile_two_on_side(Dir::North),
+						Some(Dir::East) => big_tile_template!(
+							big_tile_modification!("dir" => Constant::Float(2.)), BigTilePart::Source,
+							BigTilePart::Empty, BigTilePart::Empty
+						),
+						Some(Dir::West) => big_tile_template!(
+							BigTilePart::Source, big_tile_modification!("dir" => Constant::Float(2.)),
+							BigTilePart::Empty, BigTilePart::Empty
+						),
+						_ => BIG_TILE_FILL.clone(),
+					}
+				}
+				["obj", "atlasplaque", ..] |
+				["obj", "machinery", "phone", "wall", ..] |
+				["obj", "noticeboard", "persistent", ..] |
+				["obj", "bookshelf", "persistent", ..] |
+				["obj", "submachine", "GTM", ..] |
+				["obj", "machinery", "computer", "airbr", ..] |
+				["obj", "machinery", "computer", "riotgear", ..] |
+				["obj", "machinery", "door_timer", ..] |
+				["obj", "machinery", "power", "apc", ..] => {
+					get_pixel_shift(prefab, &objtree)
+						.and_then(dir::pixel_shift_to_cardinal_dir)
+						.and_then(|x| Some(big_tile_one_on_side(x)))
+						.unwrap_or(BIG_TILE_JUST_BOTTOM_LEFT.clone())
+				}
+				/*
+				["obj", "machinery", "camera", ..] => {
+					get_pixel_shift(prefab, &objtree)
+						.and_then(dir::pixel_shift_to_cardinal_dir)
+						.or(dir.map(dir::Dir::flip))
+						.and_then(|x| Some(big_tile_one_on_side(x)))
+						.unwrap_or(BIG_TILE_JUST_BOTTOM_LEFT.clone())
+				}
+				*/
+				["obj", "item", "device", "radio", "intercom", ..] => {
+					dir
+						.and_then(|x| Some(big_tile_one_on_side(x.flip())))
+						.unwrap_or(BIG_TILE_FILL.clone())
+				}
+				["obj", "machinery", "firealarm", ..] | 
+				["obj", "submachine", "ATM", ..] | 
+				["obj", "machinery", "door_control", ..] |
+				["obj", "noticeboard", ..] |
+				["obj", "bookshelf", ..] |
+				["obj", "machinery", "turretid", ..] |
+				["obj", "item_dispenser", ..] |
+				["obj", "machinery", "light_switch", ..] |
+				["obj", "drink_rack", ..] |
+				["obj", "item", "device", "audio_log", "wall_mounted", ..] |
+				["obj", "machinery", "activation_button", ..] |
+				["obj", "machinery", "ai_status_display", ..] |
+				["obj", "machinery", "flasher", "solitary", ..] |
+				["obj", "item", "storage", "secure", "ssafe", ..] |
+				["obj", "blind_switch", ..] |
+				["obj", "machinery", "light", "incandescent", "small", ..] |
+				["obj", "machinery", "light", "small", ..] => {
+					get_pixel_shift(prefab, &objtree)
+						.and_then(dir::pixel_shift_to_cardinal_dir)
+						.or(dir)
+						.and_then(|x| Some(big_tile_two_on_side(x)))
+						.unwrap_or(BIG_TILE_FILL.clone())
+				}, |
+				["obj", "window", ..] if dir.map(dir::Dir::is_cardinal) == Some(false) => {
+					BIG_TILE_FILL.clone()
+				}
+				["obj", "stool", "chair", ..] => {
+					find_neighbor_dir_filter(&map, coord, |prefab, table_dir|
+						dir.map(|d| d == table_dir).unwrap_or(true) && (
+							prefab.path.starts_with("/obj/table") ||
+							prefab.path.starts_with("/obj/machinery/computer")
+						)
+					).or(solid_neigh)
+					.and_then(|x| Some(big_tile_two_on_side(x)))
+					.or_else(|| dir.and_then(|x| Some(big_tile_two_on_side(x))))
+					.unwrap_or(BIG_TILE_FILL.clone())
+				}
+				["obj", "machinery", "light", ..] |
+				["obj", "machinery", "power", "terminal"] |
+				["obj", "machinery", "door", "airlock", "pyro", "glass", "windoor", ..] |
+				["obj", "machinery", "atmospherics", "unary", ..] | // pipe?
+				["obj", "machinery", "atmospherics", "pipe", "vent", ..] | // pipe?
+				["obj", "machinery", "atmospherics", "portables_connector", ..] | // pipe?
+				["obj", "potted_plant", ..] |
+				["obj", "window", ..] |
+				["obj", "decal", "boxingrope", ..] |
+				["obj", "decal", "boxingropeenter", ..] |
+				["obj", "machinery", "recharger", "wall", ..] |
+				["obj", "machinery", "door", "window", ..] |
+				["obj", "machinery", "disposal", "small", ..] |
+				["obj", "machinery", "shower", ..] |
+				["obj", "railing", ..] => {
+					dir //TODO yeet diagonal
+						.and_then(|x| Some(big_tile_two_on_side(x)))
+						.unwrap_or(BIG_TILE_FILL.clone())
+				},
+				["obj", "item", "storage", "wall", ..] |
+				["obj", "machinery", "networked", "secdetector", ..] |
+				["obj", "machinery", "disposaloutlet", ..] |
+				["obj", "submachine", "chef_sink", ..] => {
+					dir
+						.and_then(|x| Some(big_tile_two_on_side(x.flip())))
+						.unwrap_or(BIG_TILE_FILL.clone())
+				},
+				["obj", "machinery", "ghostdrone_factory", ..] => {
+					big_tile_one_on_side(dir::Dir::East)
+				}
+				/*
+				["obj", "decal", "cleanable", "cobweb", ..] |
+				["obj", "decal", "cleanable", "cobweb2", ..] => {
+					// TODO: scale up?
+					match get_var(prefab, &objtree, "icon_state") {
+						Some(Constant::String(s)) if **s == *"cobweb1" => big_tile_one_on_side(dir::Dir::NorthWest),
+						Some(Constant::String(s)) if **s == *"cobweb2" => big_tile_one_on_side(dir::Dir::NorthEast),
+						_ => BIG_TILE_FILL.clone(),
+					}
+				},
+				*/
+				["obj", "landmark", "random_room", room_size] => {
+					let scale = match *room_size {
+						"size3x3" => (3, 3),
+						"size3x5" => (3, 5),
+						"size5x3" => (5, 3),
+						_ => (0, 0),
+					};
+					place_with_shift_scale(&mut out_map, &mut_prefab, coord.xy(), scale);
+					BIG_TILE_EMPTY.clone()
+				}
+				["obj", "cable", ..] => {
+					let icon_state = get_var(prefab, &objtree, "icon_state").unwrap().to_string();
+					big_tile_cable(&icon_state).unwrap_or(BIG_TILE_FILL.clone())
+				}
+				["obj", "forcefield", "energyshield", "perma", "doorlink", ..] => {
+					// these screw themselves up if left like this
+					mut_prefab.path = "/obj/structure/forcefield/energyshield/perma".to_string();
+					BIG_TILE_FILL.clone()
+				}
+				["obj", "machinery", "atmospherics", ..] =>
+					//TODO
+					BIG_TILE_FILL.clone(),
+				["obj", "machinery", "portable_atmospherics", ..] |
+				["obj", "machinery", "vehicle", ..] |
+				["obj", "machinery", "mass_driver", ..] |
+				["obj", "machinery", "launcher_loader", ..] |
+				["obj", "decal", "poster", "wallsign", "stencil", ..] |
+				["obj", "machinery", "networked", "telepad", ..] |
+				["obj", "machinery", "cargo_router", ..] | // TODO
+				["obj", "machinery", "power", ..] =>
+					BIG_TILE_FILL.clone(),
+				["obj", "machinery", ..] |
+				["obj", "shrub", ..] |
+				["obj", "submachine", ..] |
+				["obj", "cryotron", ..] |
+				["obj", "overlay", ..] |
+				["obj", "plasticflaps", ..] |
+				["obj", "decal", "cleanable", "ripped_poster", ..] |
+				["obj", "dartboard", ..] |
+				["obj", "lattice", ..] |
+				["obj", "grille", "catwalk", ..] |
+				["obj", "decal", "poster", ..] |
+				["obj", "effects", "background_objects", ..] |
+				["obj", "tree1", ..] |
+				["turf", "simulated", "wall", "auto", "shuttle", ..] |
+				["obj", "indestructible", ..] |
+				["obj", "barber_pole", ..] |
+				["obj", "securearea", ..] |
+				["obj", "reagent_dispensers", "watertank", "fountain", ..] |
+				["obj", "decal", "cleanable", "cobweb", ..] |
+				["obj", "decal", "cleanable", "cobweb2", ..] |
+				["obj", "player_piano", ..] => 
+					big_tile_upscale_dynamic(prefab, &objtree),
+				_ => BIG_TILE_FILL.clone(),
+			};
+			apply_big_tile(&mut out_map, &big_tile, &mut_prefab, coord.xy());
 		}
 	}
 
-	let out_map = finish_map(&mut out_map).unwrap();
-	out_map.to_file("atlas_big.dmm".as_ref()).unwrap();
+	let out_map = out_map.finish().unwrap();
+	out_map.to_file("cogmap_big.dmm".as_ref()).unwrap();
+	println!("done");
 }
