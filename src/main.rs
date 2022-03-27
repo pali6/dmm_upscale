@@ -112,8 +112,6 @@ fn main() {
 				["obj", "machinery", "networked", "mainframe", ..] |
 				["obj", "landmark", "map", ..] |
 				["obj", "item", "device", "radio", "beacon", ..] |
-				["obj", "voting_box", ..] |
-				["obj", "machinery", "vehicle", "pod_smooth", ..] |
 				["obj", "machinery", "navbeacon", ..] => 
 					BIG_TILE_JUST_BOTTOM_LEFT.clone(),
 				["obj", "decal", "fakeobjects", "airmonitor_broken", ..] |
@@ -254,6 +252,10 @@ fn main() {
 					}
 				},
 				*/
+				["obj", "machinery", "vehicle", "pod_smooth", ..] => {
+					place_with_shift_scale(&mut out_map, &mut_prefab, coord.xy(), (2, 2));
+					BIG_TILE_EMPTY.clone()
+				}
 				["obj", "landmark", "random_room", room_size] => {
 					let scale = match *room_size {
 						"size3x3" => (3, 3),
@@ -282,6 +284,7 @@ fn main() {
 				["obj", "machinery", "launcher_loader", ..] |
 				["obj", "decal", "poster", "wallsign", "stencil", ..] |
 				["obj", "machinery", "networked", "telepad", ..] |
+				["obj", "machinery", "turret", ..] |
 				["obj", "machinery", "cargo_router", ..] | // TODO
 				["obj", "machinery", "power", ..] =>
 					BIG_TILE_FILL.clone(),
@@ -301,13 +304,23 @@ fn main() {
 				["obj", "effects", "background_objects", ..] |
 				["obj", "tree1", ..] |
 				["obj", "indestructible", ..] |
+				["obj", "fitness", "speedbag", ..] |
 				["obj", "barber_pole", ..] |
+				["obj", "decal", "fakeobjects", "pole", ..] |
+				["obj", "voting_box", ..] |
 				["obj", "securearea", ..] |
 				["obj", "reagent_dispensers", "watertank", "fountain", ..] |
 				["obj", "decal", "cleanable", "cobweb", ..] |
 				["obj", "decal", "cleanable", "cobweb2", ..] |
-				["obj", "player_piano", ..] => 
-					big_tile_upscale_dynamic(prefab, &objtree),
+				["obj", "kitchenspike", ..] |
+				["obj", "player_piano", ..] => {
+					let anchored = get_var(prefab, &objtree, "anchored").and_then(Constant::to_float).unwrap_or(1.) != 0.;
+					if anchored {
+						big_tile_upscale_dynamic(prefab, &objtree)
+					} else {
+						BIG_TILE_FILL.clone()
+					}
+				}
 				_ => BIG_TILE_FILL.clone(),
 			};
 			apply_big_tile(&mut out_map, &big_tile, &mut_prefab, coord.xy());
