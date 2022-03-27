@@ -312,6 +312,7 @@ fn main() {
 				["obj", "reagent_dispensers", "watertank", "fountain", ..] |
 				["obj", "decal", "cleanable", "cobweb", ..] |
 				["obj", "decal", "cleanable", "cobweb2", ..] |
+				["obj", "item", "storage", "toilet", ..] |
 				["obj", "kitchenspike", ..] |
 				["obj", "player_piano", ..] => {
 					let anchored = get_var(prefab, &objtree, "anchored").and_then(Constant::to_float).unwrap_or(1.) != 0.;
