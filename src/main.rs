@@ -270,7 +270,7 @@ fn main() {
 				}
 				["obj", "forcefield", "energyshield", "perma", "doorlink", ..] => {
 					// these screw themselves up if left like this
-					mut_prefab.path = "/obj/structure/forcefield/energyshield/perma".to_string();
+					mut_prefab.path = "/obj/forcefield/energyshield/perma".to_string();
 					BIG_TILE_FILL.clone()
 				}
 				["obj", "machinery", "atmospherics", ..] =>
