@@ -474,8 +474,9 @@ fn main() {
 				["obj", "machinery", "atmospherics", ..] =>
 					//TODO
 					BIG_TILE_FILL.clone(),
+				["obj", "machinery", "power", "pt_laser", ..] |
 				["obj", "machinery", "power", "furnace", ..] => 
-				big_tile_upscale_dynamic(prefab, &objtree),
+					big_tile_upscale_dynamic(prefab, &objtree),
 				["obj", "machinery", "portable_atmospherics", ..] |
 				["obj", "machinery", "vehicle", ..] |
 				["obj", "machinery", "mass_driver", ..] |
@@ -483,6 +484,7 @@ fn main() {
 				["obj", "decal", "poster", "wallsign", "stencil", ..] |
 				["obj", "machinery", "networked", "telepad", ..] |
 				["obj", "machinery", "turret", ..] |
+				["obj", "submachine", "chicken_incubator", ..] |
 				["obj", "machinery", "cargo_router", ..] | // TODO
 				["obj", "machinery", "power", ..] =>
 					BIG_TILE_FILL.clone(),
@@ -504,7 +506,7 @@ fn main() {
 				["obj", "indestructible", ..] |
 				["obj", "fitness", "speedbag", ..] |
 				["obj", "barber_pole", ..] |
-				["obj", "decal", "fakeobjects", "pole", ..] |
+				["obj", "decal", "fakeobjects", ..] |
 				["obj", "voting_box", ..] |
 				["obj", "securearea", ..] |
 				["obj", "disposaloutlet", ..] |
