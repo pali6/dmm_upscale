@@ -71,6 +71,36 @@ impl Dir {
 			_ => false,
 		}
 	}
+
+	pub fn turn_clockwise(self) -> Dir {
+		match self {
+			Dir::North => Dir::East,
+			Dir::East => Dir::South,
+			Dir::South => Dir::West,
+			Dir::West => Dir::North,
+			Dir::NorthEast => Dir::SouthEast,
+			Dir::SouthEast => Dir::SouthWest,
+			Dir::SouthWest => Dir::NorthWest,
+			Dir::NorthWest => Dir::NorthEast,
+		}
+	}
+
+	pub fn turn_anticlockwise(self) -> Dir {
+		match self {
+			Dir::North => Dir::West,
+			Dir::East => Dir::North,
+			Dir::South => Dir::East,
+			Dir::West => Dir::South,
+			Dir::NorthEast => Dir::NorthWest,
+			Dir::SouthEast => Dir::SouthWest,
+			Dir::SouthWest => Dir::SouthEast,
+			Dir::NorthWest => Dir::NorthEast,
+		}
+	}
+
+	pub fn to_constant(self) -> Constant {
+		Constant::Float((self as i32) as f32)
+	}
 }
 
 impl TryFrom<i32> for Dir {

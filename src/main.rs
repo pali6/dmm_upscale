@@ -74,6 +74,15 @@ fn split_path<'a>(path: &'a String) -> Vec<&'a str> {
 	path.split("/").collect::<Vec<_>>()
 }
 
+fn build_path(path: &str, subpath: &[&str]) -> String {
+	path.to_string() + (if subpath.len() == 0 {
+		"".to_string()
+	}
+	else {
+		"/".to_string() + subpath.join("/").as_str()
+	}).as_str()
+}
+
 fn main() {
 	println!("begin");
 	let map = dmm::Map::from_file(r"..\..\goonstation\maps\cogmap.dmm".as_ref());
@@ -275,6 +284,65 @@ fn main() {
 					mut_prefab.path = "/obj/forcefield/energyshield/perma".to_string();
 					BIG_TILE_FILL.clone()
 				}
+				
+				// DISPOSAL PIPES
+				["obj", "disposalpipe", "trunk", subpath @ ..] => {
+					let mut straight_pipe = prefab.clone();
+					straight_pipe.path = build_path("/obj/disposalpipe/segment", subpath);
+
+					match dir {
+						Some(Dir::North) => big_tile_template!(
+							BigTilePart::FixedPrefab(straight_pipe.clone()), BigTilePart::FixedPrefab(straight_pipe),
+							BigTilePart::Source, BigTilePart::Source
+						),
+						Some(Dir::South) => big_tile_template!(
+							BigTilePart::Empty, BigTilePart::Empty,
+							BigTilePart::Source, BigTilePart::Source
+						),
+						Some(Dir::East) => big_tile_template!(
+							BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe.clone()),
+							BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe)
+						),
+						Some(Dir::West) => big_tile_template!(
+							BigTilePart::Source, BigTilePart::Empty,
+							BigTilePart::Source, BigTilePart::Empty
+						),
+						_ => BIG_TILE_FILL.clone()
+					}
+				}
+				["obj", "disposalpipe", "segment", subpath @ ..] => {
+					let icon_state = get_var(prefab, &objtree, "icon_state").and_then(Constant::as_str).unwrap_or("");
+					match icon_state {
+						"pipe-c" => {
+							let mut straight_pipe = prefab.clone();
+							straight_pipe.path = build_path("/obj/disposalpipe/segment", subpath);
+							straight_pipe.vars.insert("icon_state".to_string(), Constant::string("pipe-s"));
+							let mut straight_pipe_side = straight_pipe.clone();
+							straight_pipe_side.vars.insert("dir".to_string(), dir.unwrap_or(Dir::South).turn_clockwise().to_constant());
+							match dir {
+								Some(Dir::North) => big_tile_template!(
+									BigTilePart::FixedPrefab(straight_pipe), BigTilePart::Source,
+									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe_side)
+								),
+								Some(Dir::South) => big_tile_template!(
+									BigTilePart::FixedPrefab(straight_pipe_side), BigTilePart::Source,
+									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe)
+								),
+								Some(Dir::East) => big_tile_template!(
+									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe),
+									BigTilePart::FixedPrefab(straight_pipe_side), BigTilePart::Source
+								),
+								Some(Dir::West) => big_tile_template!(
+									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe_side),
+									BigTilePart::FixedPrefab(straight_pipe), BigTilePart::Source
+								),
+								_ => BIG_TILE_FILL.clone()
+							}
+						}
+						_ => BIG_TILE_FILL.clone()
+					}
+				}
+
 				["obj", "machinery", "atmospherics", ..] =>
 					//TODO
 					BIG_TILE_FILL.clone(),
