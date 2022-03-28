@@ -225,6 +225,7 @@ fn main() {
 				["obj", "machinery", "atmospherics", "unary", ..] | // pipe?
 				["obj", "machinery", "atmospherics", "pipe", "vent", ..] | // pipe?
 				["obj", "machinery", "atmospherics", "portables_connector", ..] | // pipe?
+				["obj", "machinery", "atmospherics", "pipe", "tank", ..] | // pipe?
 				["obj", "potted_plant", ..] |
 				["obj", "window", ..] |
 				["obj", "decal", "boxingrope", ..] |
@@ -378,9 +379,103 @@ fn main() {
 						_ => BIG_TILE_FILL.clone()
 					}
 				}
+				["obj", "machinery", "atmospherics", "pipe", "simple", "junction", ..] |
+				["obj", "machinery", "atmospherics", "valve", ..] |
+				["obj", "machinery", "atmospherics", "binary", ..] => {
+					let mut straight_pipe = Prefab{
+						path: "/obj/machinery/atmospherics/pipe/simple".to_string(),
+						vars: Default::default(),
+					};
+					straight_pipe.vars.insert("dir".to_string(), dir.to_constant());
+					match dir {
+						Dir::North => big_tile_template!(
+							BigTilePart::Source, BigTilePart::Source,
+							BigTilePart::FixedPrefab(straight_pipe.clone()), BigTilePart::FixedPrefab(straight_pipe)
+						),
+						Dir::South => big_tile_template!(
+							BigTilePart::FixedPrefab(straight_pipe.clone()), BigTilePart::FixedPrefab(straight_pipe),
+							BigTilePart::Source, BigTilePart::Source
+						),
+						Dir::East => big_tile_template!(
+							BigTilePart::FixedPrefab(straight_pipe.clone()), BigTilePart::Source, 
+							BigTilePart::FixedPrefab(straight_pipe), BigTilePart::Source
+						),
+						Dir::West => big_tile_template!(
+							BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe.clone()),
+							BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe)
+						),
+						_ => BIG_TILE_FILL.clone()
+					}
+				}
+				["obj", "machinery", "atmospherics", "pipe", "simple", ..] => {
+					match dir {
+						Dir::North | Dir::South | Dir::East | Dir::West => BIG_TILE_FILL.clone(),
+						Dir::NorthEast => big_tile_template!(
+							big_tile_modification!("dir" => Dir::North.to_constant()), BigTilePart::Source,
+							BigTilePart::Source, big_tile_modification!("dir" => Dir::East.to_constant())
+						),
+						Dir::NorthWest => big_tile_template!(
+							BigTilePart::Source, big_tile_modification!("dir" => Dir::North.to_constant()), 
+							big_tile_modification!("dir" => Dir::West.to_constant()), BigTilePart::Source
+						),
+						Dir::SouthEast => big_tile_template!(
+							BigTilePart::Source, big_tile_modification!("dir" => Dir::East.to_constant()), 
+							big_tile_modification!("dir" => Dir::South.to_constant()), BigTilePart::Source
+						),
+						Dir::SouthWest => big_tile_template!(
+							big_tile_modification!("dir" => Dir::West.to_constant()), BigTilePart::Source,
+							BigTilePart::Source, big_tile_modification!("dir" => Dir::South.to_constant())
+						)
+					}
+				}
+				["obj", "machinery", "atmospherics", pipe_type @ "mixer", ..]  | 
+				["obj", "machinery", "atmospherics", pipe_type @ "pipe", "manifold", ..] => {
+					let down_dir = match *pipe_type {
+						"pipe" => dir.flip(),
+						"mixer" => dir.turn_clockwise(),
+						_ => dir.flip(),
+					};
+					let mut down_pipe = Prefab{
+						path: "/obj/machinery/atmospherics/pipe/simple".to_string(),
+						vars: Default::default(),
+					};
+					down_pipe.vars.insert("dir".to_string(), down_dir.to_constant());
+					let mut side_pipe = down_pipe.clone();
+					side_pipe.vars.insert("dir".to_string(), down_dir.turn_clockwise().to_constant());
+					// copypasted code here we go >:)
+					match down_dir {
+						Dir::South => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::FixedPrefab(side_pipe.clone())], vec![BigTilePart::Source],
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(side_pipe), BigTilePart::FixedPrefab(down_pipe)],
+							]
+						},
+						Dir::North => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::FixedPrefab(down_pipe), BigTilePart::FixedPrefab(side_pipe.clone())], vec![BigTilePart::Source],
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(side_pipe)],
+							]
+						},
+						Dir::East => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(down_pipe), BigTilePart::FixedPrefab(side_pipe.clone())],
+								vec![BigTilePart::FixedPrefab(side_pipe)], vec![BigTilePart::Source]
+							]
+						},
+						Dir::West => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(side_pipe.clone())],
+								vec![BigTilePart::FixedPrefab(down_pipe), BigTilePart::FixedPrefab(side_pipe)], vec![BigTilePart::Source]
+							]
+						},
+						_ => BIG_TILE_FILL.clone()
+					}
+				}
 				["obj", "machinery", "atmospherics", ..] =>
 					//TODO
 					BIG_TILE_FILL.clone(),
+				["obj", "machinery", "power", "furnace", ..] => 
+				big_tile_upscale_dynamic(prefab, &objtree),
 				["obj", "machinery", "portable_atmospherics", ..] |
 				["obj", "machinery", "vehicle", ..] |
 				["obj", "machinery", "mass_driver", ..] |
