@@ -314,8 +314,9 @@ fn main() {
 					let icon_state = get_var(prefab, &objtree, "icon_state").and_then(Constant::as_str).unwrap_or("");
 					match icon_state {
 						"pipe-c" => {
+							let filtered_subpath = subpath.iter().filter(|&&x| ["bent", "north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
 							let mut straight_pipe = prefab.clone();
-							straight_pipe.path = build_path("/obj/disposalpipe/segment", subpath);
+							straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 							straight_pipe.vars.insert("icon_state".to_string(), Constant::string("pipe-s"));
 							let mut straight_pipe_side = straight_pipe.clone();
 							straight_pipe_side.vars.insert("dir".to_string(), dir.unwrap_or(Dir::South).turn_clockwise().to_constant());
