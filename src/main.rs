@@ -112,7 +112,8 @@ fn main() {
 				prefab.path.starts_with("/obj/machinery/door")
 			);
 			let dir = get_var(prefab, &objtree, "dir")
-				.and_then(|x| dir::Dir::try_from(x).ok());
+				.and_then(|x| dir::Dir::try_from(x).ok())
+				.unwrap_or(Dir::South);
 
 			let big_tile: BigTileTemplate = match path {
 				["obj", "machinery", "light", "small", "floor", ..] => 
@@ -144,12 +145,12 @@ fn main() {
 					big_tile_two_on_side(dir::Dir::North),
 				["obj", "stool", "chair", "couch", ..] => {
 					match dir {
-						Some(Dir::North) | Some(Dir::South) => big_tile_two_on_side(Dir::North),
-						Some(Dir::East) => big_tile_template!(
+						Dir::North | Dir::South => big_tile_two_on_side(Dir::North),
+						Dir::East => big_tile_template!(
 							big_tile_modification!("dir" => Constant::Float(2.)), BigTilePart::Source,
 							BigTilePart::Empty, BigTilePart::Empty
 						),
-						Some(Dir::West) => big_tile_template!(
+						Dir::West => big_tile_template!(
 							BigTilePart::Source, big_tile_modification!("dir" => Constant::Float(2.)),
 							BigTilePart::Empty, BigTilePart::Empty
 						),
@@ -174,15 +175,13 @@ fn main() {
 				["obj", "machinery", "camera", ..] => {
 					get_pixel_shift(prefab, &objtree)
 						.and_then(dir::pixel_shift_to_cardinal_dir)
-						.or(dir.map(dir::Dir::flip))
+						.or(Some(dir.flip()))
 						.and_then(|x| Some(big_tile_one_on_side(x)))
 						.unwrap_or(BIG_TILE_JUST_BOTTOM_LEFT.clone())
 				}
 				*/
 				["obj", "item", "device", "radio", "intercom", ..] => {
-					dir
-						.and_then(|x| Some(big_tile_one_on_side(x.flip())))
-						.unwrap_or(BIG_TILE_FILL.clone())
+					big_tile_one_on_side(dir.flip())
 				}
 				["obj", "machinery", "firealarm", ..] | 
 				["obj", "submachine", "ATM", ..] | 
@@ -203,23 +202,22 @@ fn main() {
 				["obj", "machinery", "light", "small", ..] => {
 					get_pixel_shift(prefab, &objtree)
 						.and_then(dir::pixel_shift_to_cardinal_dir)
-						.or(dir)
+						.or(Some(dir))
 						.and_then(|x| Some(big_tile_two_on_side(x)))
 						.unwrap_or(BIG_TILE_FILL.clone())
 				}, |
-				["obj", "window", ..] if dir.map(dir::Dir::is_cardinal) == Some(false) => {
+				["obj", "window", ..] if !dir.is_cardinal() => {
 					BIG_TILE_FILL.clone()
 				}
 				["obj", "stool", "chair", ..] => {
 					find_neighbor_dir_filter(&map, coord, |prefab, table_dir|
-						dir.map(|d| d == table_dir).unwrap_or(true) && (
+						dir == table_dir && (
 							prefab.path.starts_with("/obj/table") ||
 							prefab.path.starts_with("/obj/machinery/computer")
 						)
 					).or(solid_neigh)
 					.and_then(|x| Some(big_tile_two_on_side(x)))
-					.or_else(|| dir.and_then(|x| Some(big_tile_two_on_side(x))))
-					.unwrap_or(BIG_TILE_FILL.clone())
+					.unwrap_or_else(|| big_tile_two_on_side(dir))
 				}
 				["obj", "machinery", "light", ..] |
 				["obj", "machinery", "power", "terminal"] |
@@ -235,22 +233,15 @@ fn main() {
 				["obj", "machinery", "door", "window", ..] |
 				["obj", "machinery", "disposal", "small", ..] |
 				["obj", "machinery", "shower", ..] |
-				["obj", "railing", ..] => {
-					dir //TODO yeet diagonal
-						.and_then(|x| Some(big_tile_two_on_side(x)))
-						.unwrap_or(BIG_TILE_FILL.clone())
-				},
+				["obj", "railing", ..] =>
+					big_tile_two_on_side(dir),
 				["obj", "item", "storage", "wall", ..] |
 				["obj", "machinery", "networked", "secdetector", ..] |
 				["obj", "machinery", "disposaloutlet", ..] |
-				["obj", "submachine", "chef_sink", ..] => {
-					dir
-						.and_then(|x| Some(big_tile_two_on_side(x.flip())))
-						.unwrap_or(BIG_TILE_FILL.clone())
-				},
-				["obj", "machinery", "ghostdrone_factory", ..] => {
-					big_tile_one_on_side(dir::Dir::East)
-				}
+				["obj", "submachine", "chef_sink", ..] => 
+					big_tile_two_on_side(dir.flip()),
+				["obj", "machinery", "ghostdrone_factory", ..] =>
+					big_tile_one_on_side(dir::Dir::East),
 				/*
 				["obj", "decal", "cleanable", "cobweb", ..] |
 				["obj", "decal", "cleanable", "cobweb2", ..] => {
@@ -292,7 +283,7 @@ fn main() {
 					let mut straight_pipe = prefab.clone();
 					straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 
-					match dir.unwrap_or(Dir::South) {
+					match dir {
 						Dir::North => big_tile_template!(
 							BigTilePart::FixedPrefab(straight_pipe.clone()), BigTilePart::FixedPrefab(straight_pipe),
 							BigTilePart::Source, BigTilePart::Source
@@ -321,21 +312,21 @@ fn main() {
 							straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 							straight_pipe.vars.insert("icon_state".to_string(), Constant::string("pipe-s"));
 							let mut straight_pipe_side = straight_pipe.clone();
-							straight_pipe_side.vars.insert("dir".to_string(), dir.unwrap_or(Dir::South).turn_clockwise().to_constant());
+							straight_pipe_side.vars.insert("dir".to_string(), dir.turn_clockwise().to_constant());
 							match dir {
-								Some(Dir::North) => big_tile_template!(
+								Dir::North => big_tile_template!(
 									BigTilePart::FixedPrefab(straight_pipe), BigTilePart::Source,
 									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe_side)
 								),
-								Some(Dir::South) => big_tile_template!(
+								Dir::South => big_tile_template!(
 									BigTilePart::FixedPrefab(straight_pipe_side), BigTilePart::Source,
 									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe)
 								),
-								Some(Dir::East) => big_tile_template!(
+								Dir::East => big_tile_template!(
 									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe),
 									BigTilePart::FixedPrefab(straight_pipe_side), BigTilePart::Source
 								),
-								Some(Dir::West) => big_tile_template!(
+								Dir::West => big_tile_template!(
 									BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe_side),
 									BigTilePart::FixedPrefab(straight_pipe), BigTilePart::Source
 								),
@@ -349,9 +340,9 @@ fn main() {
 				["obj", "disposalpipe", "switch_junction", ..] => {
 					let icon_state = get_var(prefab, &objtree, "icon_state").and_then(Constant::as_str).unwrap_or("");
 					let down_dir = match icon_state {
-						"pipe-j1" | "pipe-sj1" => dir.unwrap_or(Dir::South).turn_clockwise(),
-						"pipe-j2" | "pipe-sj2" => dir.unwrap_or(Dir::South).turn_counterclockwise(),
-						"pipe-y" | _ => dir.unwrap_or(Dir::South).flip()
+						"pipe-j1" | "pipe-sj1" => dir.turn_clockwise(),
+						"pipe-j2" | "pipe-sj2" => dir.turn_counterclockwise(),
+						"pipe-y" | _ => dir.flip()
 					};
 					let mut down_pipe = Prefab{
 						path: "/obj/disposalpipe/segment".to_string(),
