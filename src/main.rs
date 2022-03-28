@@ -401,7 +401,8 @@ fn main() {
 				["obj", "kitchenspike", ..] |
 				["obj", "player_piano", ..] => {
 					let anchored = get_var(prefab, &objtree, "anchored").and_then(Constant::to_float).unwrap_or(1.) != 0.;
-					if anchored && !prefab.path.starts_with("/obj/machinery/bot"){
+					let dense = get_var(prefab, &objtree, "density").and_then(Constant::to_float).unwrap_or(1.) != 0.;
+					if anchored || !dense {
 						big_tile_upscale_dynamic(prefab, &objtree)
 					} else {
 						BIG_TILE_FILL.clone()
