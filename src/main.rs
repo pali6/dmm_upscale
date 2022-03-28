@@ -231,7 +231,6 @@ fn main() {
 				["obj", "decal", "boxingropeenter", ..] |
 				["obj", "machinery", "recharger", "wall", ..] |
 				["obj", "machinery", "door", "window", ..] |
-				["obj", "machinery", "disposal", "small", ..] |
 				["obj", "machinery", "shower", ..] |
 				["obj", "railing", ..] =>
 					big_tile_two_on_side(dir),
