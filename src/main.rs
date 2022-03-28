@@ -386,6 +386,7 @@ fn main() {
 						path: "/obj/machinery/atmospherics/pipe/simple".to_string(),
 						vars: Default::default(),
 					};
+					straight_pipe.vars.insert("level".to_string(), Constant::Float(2.));
 					straight_pipe.vars.insert("dir".to_string(), dir.to_constant());
 					match dir {
 						Dir::North => big_tile_template!(
@@ -439,6 +440,7 @@ fn main() {
 						path: "/obj/machinery/atmospherics/pipe/simple".to_string(),
 						vars: Default::default(),
 					};
+					down_pipe.vars.insert("level".to_string(), Constant::Float(2.));
 					down_pipe.vars.insert("dir".to_string(), down_dir.to_constant());
 					let mut side_pipe = down_pipe.clone();
 					side_pipe.vars.insert("dir".to_string(), down_dir.turn_clockwise().to_constant());
