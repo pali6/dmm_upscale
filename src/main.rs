@@ -279,7 +279,7 @@ fn main() {
 				
 				// DISPOSAL PIPES
 				["obj", "disposalpipe", "trunk", subpath @ ..] => {
-					let filtered_subpath = subpath.iter().filter(|&&x| ["north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
+					let filtered_subpath = subpath.iter().filter(|&&x| !["north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
 					let mut straight_pipe = prefab.clone();
 					straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 
