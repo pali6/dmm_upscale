@@ -53,6 +53,27 @@ impl WipMap {
 }
 
 fn normalize_tile(tile: &mut Vec<Prefab>) {
+	let mut found_turf = false;
+	let mut found_area = false;
+	tile.retain(|prefab| { // keep only first turf / area
+		if prefab.path.starts_with("/turf") {
+			if found_turf {
+				false
+			} else {
+				found_turf = true;
+				true
+			}
+		} else if prefab.path.starts_with("/area") {
+			if found_area {
+				false
+			} else {
+				found_area = true;
+				true
+			}
+		} else {
+			true
+		}
+	});
 	for p in tile.iter_mut() {
 		p.vars.sort_keys();
 	}
