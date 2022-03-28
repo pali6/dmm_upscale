@@ -91,6 +91,7 @@ fn main() {
 	let objtree = Context::default().parse_environment(r"..\..\goonstation\goonstation.dme".as_ref());
 	let objtree = objtree.unwrap();
 	//let objtree = ObjectTree::default();
+	println!("environment parsed");
 
 	let (width, height, z_level_count) = map.dim_xyz();
 	assert!(z_level_count == 1); // TODO
@@ -396,8 +397,10 @@ fn main() {
 			apply_big_tile(&mut out_map, &big_tile, &mut_prefab, coord.xy());
 		}
 	}
+	println!("tiles placed");
 
 	let out_map = out_map.finish().unwrap();
+	println!("map finished");
 	out_map.to_file("cogmap_big.dmm".as_ref()).unwrap();
-	println!("done");
+	println!("map saved");
 }
