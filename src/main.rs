@@ -287,8 +287,9 @@ fn main() {
 				
 				// DISPOSAL PIPES
 				["obj", "disposalpipe", "trunk", subpath @ ..] => {
+					let filtered_subpath = subpath.iter().filter(|&&x| ["north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
 					let mut straight_pipe = prefab.clone();
-					straight_pipe.path = build_path("/obj/disposalpipe/segment", subpath);
+					straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 
 					match dir {
 						Some(Dir::North) => big_tile_template!(
@@ -343,7 +344,20 @@ fn main() {
 						_ => BIG_TILE_FILL.clone()
 					}
 				}
+				["obj", "disposalpipe", "junction", subpath @ ..] |
+				["obj", "disposalpipe", "switch_junction", subpath @ ..] => {
+					let filtered_subpath = subpath.iter().filter(|&&x| ["left", "right", "north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
+					let icon_state = get_var(prefab, &objtree, "icon_state").and_then(Constant::as_str).unwrap_or("");
+					let out_dir = match icon_state {
+						"pipe-j1" | "pipe-sj1" => dir.unwrap_or(Dir::South).turn_counterclockwise(),
+						"pipe-j2" | "pipe-sj2" => dir.unwrap_or(Dir::South).turn_clockwise(),
+						"pipe-y" | _ => dir.unwrap_or(Dir::South)
+					};
+					match out_dir {
 
+						_ => BIG_TILE_FILL.clone()
+					}
+				}
 				["obj", "machinery", "atmospherics", ..] =>
 					//TODO
 					BIG_TILE_FILL.clone(),
@@ -378,6 +392,7 @@ fn main() {
 				["obj", "decal", "fakeobjects", "pole", ..] |
 				["obj", "voting_box", ..] |
 				["obj", "securearea", ..] |
+				["obj", "disposaloutlet", ..] |
 				["obj", "reagent_dispensers", "watertank", "fountain", ..] |
 				["obj", "decal", "cleanable", "cobweb", ..] |
 				["obj", "decal", "cleanable", "cobweb2", ..] |

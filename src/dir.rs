@@ -85,7 +85,7 @@ impl Dir {
 		}
 	}
 
-	pub fn turn_anticlockwise(self) -> Dir {
+	pub fn turn_counterclockwise(self) -> Dir {
 		match self {
 			Dir::North => Dir::West,
 			Dir::East => Dir::North,
