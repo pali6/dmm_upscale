@@ -292,20 +292,20 @@ fn main() {
 					let mut straight_pipe = prefab.clone();
 					straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 
-					match dir {
-						Some(Dir::North) => big_tile_template!(
+					match dir.unwrap_or(Dir::South) {
+						Dir::North => big_tile_template!(
 							BigTilePart::FixedPrefab(straight_pipe.clone()), BigTilePart::FixedPrefab(straight_pipe),
 							BigTilePart::Source, BigTilePart::Source
 						),
-						Some(Dir::South) => big_tile_template!(
+						Dir::South => big_tile_template!(
 							BigTilePart::Empty, BigTilePart::Empty,
 							BigTilePart::Source, BigTilePart::Source
 						),
-						Some(Dir::East) => big_tile_template!(
+						Dir::East => big_tile_template!(
 							BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe.clone()),
 							BigTilePart::Source, BigTilePart::FixedPrefab(straight_pipe)
 						),
-						Some(Dir::West) => big_tile_template!(
+						Dir::West => big_tile_template!(
 							BigTilePart::Source, BigTilePart::Empty,
 							BigTilePart::Source, BigTilePart::Empty
 						),
@@ -316,7 +316,7 @@ fn main() {
 					let icon_state = get_var(prefab, &objtree, "icon_state").and_then(Constant::as_str).unwrap_or("");
 					match icon_state {
 						"pipe-c" => {
-							let filtered_subpath = subpath.iter().filter(|&&x| ["bent", "north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
+							let filtered_subpath = subpath.iter().filter(|&&x| !["bent", "north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
 							let mut straight_pipe = prefab.clone();
 							straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 							straight_pipe.vars.insert("icon_state".to_string(), Constant::string("pipe-s"));
@@ -345,17 +345,46 @@ fn main() {
 						_ => BIG_TILE_FILL.clone()
 					}
 				}
-				["obj", "disposalpipe", "junction", subpath @ ..] |
-				["obj", "disposalpipe", "switch_junction", subpath @ ..] => {
-					let filtered_subpath = subpath.iter().filter(|&&x| ["left", "right", "north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
+				["obj", "disposalpipe", "junction", ..] |
+				["obj", "disposalpipe", "switch_junction", ..] => {
 					let icon_state = get_var(prefab, &objtree, "icon_state").and_then(Constant::as_str).unwrap_or("");
-					let out_dir = match icon_state {
-						"pipe-j1" | "pipe-sj1" => dir.unwrap_or(Dir::South).turn_counterclockwise(),
-						"pipe-j2" | "pipe-sj2" => dir.unwrap_or(Dir::South).turn_clockwise(),
-						"pipe-y" | _ => dir.unwrap_or(Dir::South)
+					let down_dir = match icon_state {
+						"pipe-j1" | "pipe-sj1" => dir.unwrap_or(Dir::South).turn_clockwise(),
+						"pipe-j2" | "pipe-sj2" => dir.unwrap_or(Dir::South).turn_counterclockwise(),
+						"pipe-y" | _ => dir.unwrap_or(Dir::South).flip()
 					};
-					match out_dir {
-
+					let mut down_pipe = Prefab{
+						path: "/obj/disposalpipe/segment".to_string(),
+						vars: Default::default(),
+					};
+					down_pipe.vars.insert("dir".to_string(), down_dir.to_constant());
+					let mut side_pipe = down_pipe.clone();
+					side_pipe.vars.insert("dir".to_string(), down_dir.turn_clockwise().to_constant());
+					match down_dir {
+						Dir::South => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::FixedPrefab(side_pipe.clone())], vec![BigTilePart::Source],
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(side_pipe), BigTilePart::FixedPrefab(down_pipe)],
+							]
+						},
+						Dir::North => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::FixedPrefab(down_pipe), BigTilePart::FixedPrefab(side_pipe.clone())], vec![BigTilePart::Source],
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(side_pipe)],
+							]
+						},
+						Dir::East => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(down_pipe), BigTilePart::FixedPrefab(side_pipe.clone())],
+								vec![BigTilePart::FixedPrefab(side_pipe)], vec![BigTilePart::Source]
+							]
+						},
+						Dir::West => BigTileTemplate {
+							parts: [
+								vec![BigTilePart::Source], vec![BigTilePart::FixedPrefab(side_pipe.clone())],
+								vec![BigTilePart::FixedPrefab(down_pipe), BigTilePart::FixedPrefab(side_pipe)], vec![BigTilePart::Source]
+							]
+						},
 						_ => BIG_TILE_FILL.clone()
 					}
 				}
