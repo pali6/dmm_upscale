@@ -268,8 +268,8 @@ fn main() {
 					BIG_TILE_EMPTY.clone()
 				}
 				["obj", "cable", ..] => {
-					let icon_state = get_var(prefab, &objtree, "icon_state").unwrap().to_string();
-					big_tile_cable(&icon_state).unwrap_or(BIG_TILE_FILL.clone())
+					let icon_state = get_var(prefab, &objtree, "icon_state").unwrap().as_str().unwrap();
+					big_tile_cable(icon_state).unwrap_or(BIG_TILE_FILL.clone())
 				}
 				["obj", "forcefield", "energyshield", "perma", "doorlink", ..] => {
 					// these screw themselves up if left like this

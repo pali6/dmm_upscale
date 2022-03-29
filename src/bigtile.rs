@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use dm::{constants::Constant, objtree::{ObjectTree, self}};
 use dmmtools::dmm::{Prefab, Coord2};
 
-use crate::{WipMap, dir::Dir, coord::shift_coord2, get_var};
+use crate::{WipMap, dir::Dir, dir::DirCent, coord::shift_coord2, get_var};
 
 pub const TILE_SIZE : f32 = 32.;
 
@@ -297,7 +297,7 @@ pub fn place_with_shift_scale(out_map: &mut WipMap, prefab: &Prefab, coord: Coor
 	}
 }
 
-pub fn big_tile_cable(icon_state: &String) -> Option<BigTileTemplate> {
+pub fn big_tile_cable(icon_state: &str) -> Option<BigTileTemplate> {
 	/*
 	let [a, b, ..] = icon_state.split("-").collect::<Vec<_>>().as_slice();
 	match (*a, *b) {
@@ -324,11 +324,13 @@ pub fn big_tile_cable(icon_state: &String) -> Option<BigTileTemplate> {
 	*/
 	let icon_state_parts = icon_state.split("-").collect::<Vec<_>>();
 	let icon_state_parts = icon_state_parts.as_slice();
-	let (_, _, icon_mod) = match *icon_state_parts {
+	let (a, b, icon_mod) = match *icon_state_parts {
 		[a, b, icon_mod] => (a, b, "-".to_owned() + icon_mod),
 		[a, b] => (a, b, "".to_owned()),
 		_ => return None,
 	};
+	let a = DirCent::try_from(a.parse::<i32>().ok()?).ok()?;
+	let b = DirCent::try_from(b.parse::<i32>().ok()?).ok()?;
 	macro_rules! modcable {
 		($a:expr, $b:expr) => {
 			{
@@ -341,48 +343,111 @@ pub fn big_tile_cable(icon_state: &String) -> Option<BigTileTemplate> {
 			}
 		}
 	}
-	Some(BigTileTemplate {
-		parts: [
-			vec![
-				modcable!(0, 1),
-				modcable!(0, 2),
-				modcable!(0, 4),
-				modcable!(0, 8),
-				modcable!(0, 5),
-				modcable!(0, 6),
-				modcable!(0, 9),
-				modcable!(0, 10),
-			],
-			vec![
-				modcable!(0, 1),
-				modcable!(0, 2),
-				modcable!(0, 4),
-				modcable!(0, 8),
-				modcable!(0, 5),
-				modcable!(0, 6),
-				modcable!(0, 9),
-				modcable!(0, 10),
-			],
-			vec![
-				modcable!(0, 1),
-				modcable!(0, 2),
-				modcable!(0, 4),
-				modcable!(0, 8),
-				modcable!(0, 5),
-				modcable!(0, 6),
-				modcable!(0, 9),
-				modcable!(0, 10),
-			],
-			vec![
-				modcable!(0, 1),
-				modcable!(0, 2),
-				modcable!(0, 4),
-				modcable!(0, 8),
-				modcable!(0, 5),
-				modcable!(0, 6),
-				modcable!(0, 9),
-				modcable!(0, 10),
-			],
-		]
+	use DirCent::*;
+
+	Some(match (a, b) {
+		(North, South) | (East, West) =>
+			BIG_TILE_FILL.clone(),
+		(Center, North) =>
+			BigTileTemplate {
+				parts: [
+					vec![
+						modcable!(Center, North),
+						modcable!(Center, South),
+					],
+					vec![
+						modcable!(Center, North),
+						modcable!(Center, South),
+					],
+					vec![
+						modcable!(Center, North),
+					],
+					vec![
+						modcable!(Center, North),
+					],
+				]
+			},
+		(Center, East) =>
+			BigTileTemplate {
+				parts: [
+					vec![
+						modcable!(Center, East),
+					],
+					vec![
+						modcable!(Center, East),
+						modcable!(Center, West),
+					],
+					vec![
+						modcable!(Center, East),
+					],
+					vec![
+						modcable!(Center, East),
+						modcable!(Center, West),
+					],
+				]
+			},
+		(Center, South) =>
+			BigTileTemplate {
+				parts: [
+					vec![
+						modcable!(Center, South),
+					],
+					vec![
+						modcable!(Center, South),
+					],
+					vec![
+						modcable!(Center, North),
+						modcable!(Center, South),
+					],
+					vec![
+						modcable!(Center, North),
+						modcable!(Center, South),
+					],
+				]
+			},
+		(Center, West) =>
+			BigTileTemplate {
+				parts: [
+					vec![
+						modcable!(Center, East),
+						modcable!(Center, West),
+					],
+					vec![
+						modcable!(Center, West),
+					],
+					vec![
+						modcable!(Center, East),
+						modcable!(Center, West),
+					],
+					vec![
+						modcable!(Center, West),
+					],
+				]
+			},
+		(North, East) => big_tile_template!(
+			modcable!(North, South), Source,
+			Source, modcable!(East, West)
+		),
+		(North, West) => big_tile_template!(
+			Source, modcable!(North, South), 
+			modcable!(East, West), Source
+		),
+		(South, East) => big_tile_template!(
+			Source, modcable!(East, West), 
+			modcable!(North, South), Source
+		),
+		(South, West) => big_tile_template!(
+			modcable!(East, West), Source,
+			Source, modcable!(North, South)
+		),
+		_ => {
+			let all_dir_cables = crate::dir::DIRS.iter().map(|&dir| modcable!(Center, DirCent::from_dir(dir))).collect::<Vec<_>>();
+			BigTileTemplate {
+				parts: [
+					all_dir_cables.clone(), all_dir_cables.clone(),
+					all_dir_cables.clone(), all_dir_cables,
+				]
+			}
+		}
 	})
 }
