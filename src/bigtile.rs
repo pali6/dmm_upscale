@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, cmp::min, cmp::max};
 
 use lazy_static::lazy_static;
 
@@ -298,30 +298,6 @@ pub fn place_with_shift_scale(out_map: &mut WipMap, prefab: &Prefab, coord: Coor
 }
 
 pub fn big_tile_cable(icon_state: &str) -> Option<BigTileTemplate> {
-	/*
-	let [a, b, ..] = icon_state.split("-").collect::<Vec<_>>().as_slice();
-	match (*a, *b) {
-		("0", "1") =>
-			BigTileTemplate {
-				parts: [
-					&[
-						&big_tile_modification!("icon_state" => Constant::String("0-1".into())),
-						&big_tile_modification!("icon_state" => Constant::String("0-2".into()))
-					],
-					&[
-						&big_tile_modification!("icon_state" => Constant::String("0-1".into())),
-						&big_tile_modification!("icon_state" => Constant::String("0-2".into()))
-					],
-					&[
-						&big_tile_modification!("icon_state" => Constant::String("0-1".into()))
-					],
-					&[
-						&big_tile_modification!("icon_state" => Constant::String("0-1".into()))
-					],
-				]
-			}
-	}
-	*/
 	let icon_state_parts = icon_state.split("-").collect::<Vec<_>>();
 	let icon_state_parts = icon_state_parts.as_slice();
 	let (a, b, icon_mod) = match *icon_state_parts {
@@ -331,13 +307,28 @@ pub fn big_tile_cable(icon_state: &str) -> Option<BigTileTemplate> {
 	};
 	let a = DirCent::try_from(a.parse::<i32>().ok()?).ok()?;
 	let b = DirCent::try_from(b.parse::<i32>().ok()?).ok()?;
+	let (ma, mb, unturn, unmirror) =
+		[
+			(0, false), (1, false), (2, false), (3, false),
+			(0, true), (1, true), (2, true), (3, true)
+		]
+		.iter()
+		.map(|(turn_amount, do_mirror)| {
+			let ma = a.mirror_turn(*do_mirror, *turn_amount);
+			let mb = b.mirror_turn(*do_mirror, *turn_amount);
+			(min(ma, mb), max(ma, mb), -turn_amount, *do_mirror)})
+		.min()
+		.unwrap();
+
 	macro_rules! modcable {
 		($a:expr, $b:expr) => {
 			{
 				let icon_mod = icon_mod.clone();
 				BigTilePart::ModifiedSource(Arc::new(move |prefab| {
 					let mut output = prefab.clone();
-					output.vars.insert("icon_state".to_string(), Constant::String(format!("{}-{}{}", $a, $b, icon_mod).into()));
+					let reta = $a.turn_mirror(unturn, unmirror);
+					let retb = $b.turn_mirror(unturn, unmirror);
+					output.vars.insert("icon_state".to_string(), Constant::String(format!("{}-{}{}", min(reta, retb), max(reta, retb), icon_mod).into()));
 					output
 				}))
 			}
@@ -345,7 +336,7 @@ pub fn big_tile_cable(icon_state: &str) -> Option<BigTileTemplate> {
 	}
 	use DirCent::*;
 
-	Some(match (a, b) {
+	let mut result = match (ma, mb) {
 		(North, South) | (East, West) =>
 			BIG_TILE_FILL.clone(),
 		(Center, North) =>
@@ -367,78 +358,93 @@ pub fn big_tile_cable(icon_state: &str) -> Option<BigTileTemplate> {
 					],
 				]
 			},
-		(Center, East) =>
+		(Center, NorthEast) =>
 			BigTileTemplate {
 				parts: [
 					vec![
 						modcable!(Center, East),
 					],
 					vec![
-						modcable!(Center, East),
+						modcable!(Center, NorthEast),
 						modcable!(Center, West),
-					],
-					vec![
-						modcable!(Center, East),
-					],
-					vec![
-						modcable!(Center, East),
-						modcable!(Center, West),
-					],
-				]
-			},
-		(Center, South) =>
-			BigTileTemplate {
-				parts: [
-					vec![
+						modcable!(Center, SouthWest),
 						modcable!(Center, South),
 					],
 					vec![
-						modcable!(Center, South),
+						modcable!(Center, NorthEast),
 					],
 					vec![
 						modcable!(Center, North),
-						modcable!(Center, South),
-					],
-					vec![
-						modcable!(Center, North),
-						modcable!(Center, South),
 					],
 				]
 			},
-		(Center, West) =>
+		(North, NorthEast) =>
 			BigTileTemplate {
 				parts: [
 					vec![
-						modcable!(Center, East),
-						modcable!(Center, West),
+						modcable!(North, South),
 					],
 					vec![
-						modcable!(Center, West),
+						modcable!(North, NorthEast),
+						modcable!(SouthWest, NorthEast),
 					],
 					vec![
-						modcable!(Center, East),
-						modcable!(Center, West),
+						modcable!(North, NorthEast),
 					],
 					vec![
-						modcable!(Center, West),
+					],
+				]
+			},
+		(North, SouthEast) =>
+			BigTileTemplate {
+				parts: [
+					vec![
+						modcable!(North, SouthEast),
+					],
+					vec![
+						modcable!(North, South),
+					],
+					vec![
+					],
+					vec![
+						modcable!(NorthWest, SouthEast),
+						modcable!(North, SouthEast),
+					],
+				]
+			},
+		(NorthEast, SouthEast) =>
+			BigTileTemplate {
+				parts: [
+					vec![
+					],
+					vec![
+						modcable!(NorthEast, South),
+					],
+					vec![
+					],
+					vec![
+						modcable!(North, SouthEast),
+					],
+				]
+			},
+		(NorthEast, SouthWest) =>
+			BigTileTemplate {
+				parts: [
+					vec![
+					],
+					vec![
+						modcable!(NorthEast, SouthWest),
+					],
+					vec![
+						modcable!(NorthEast, SouthWest),
+					],
+					vec![
 					],
 				]
 			},
 		(North, East) => big_tile_template!(
 			modcable!(North, South), Source,
 			Source, modcable!(East, West)
-		),
-		(North, West) => big_tile_template!(
-			Source, modcable!(North, South), 
-			modcable!(East, West), Source
-		),
-		(South, East) => big_tile_template!(
-			Source, modcable!(East, West), 
-			modcable!(North, South), Source
-		),
-		(South, West) => big_tile_template!(
-			modcable!(East, West), Source,
-			Source, modcable!(North, South)
 		),
 		_ => {
 			let all_dir_cables = crate::dir::DIRS.iter().map(|&dir| modcable!(Center, DirCent::from_dir(dir))).collect::<Vec<_>>();
@@ -449,5 +455,29 @@ pub fn big_tile_cable(icon_state: &str) -> Option<BigTileTemplate> {
 				]
 			}
 		}
-	})
+	};
+	turn_2x2(&mut result.parts, unturn);
+	if unmirror {
+		mirror_2x2(&mut result.parts);
+	}
+	Some(result)
+}
+
+
+
+fn turn_2x2_clockwise<T>(matrix: &mut [T; 4]) {
+	matrix.swap(0, 1);
+	matrix.swap(0, 3);
+	matrix.swap(0, 2);
+}
+
+fn turn_2x2<T>(matrix: &mut [T; 4], amount: i32) {
+	for _ in 0..((amount % 4 + 4) % 4) {
+		turn_2x2_clockwise(matrix);
+	}
+}
+
+fn mirror_2x2<T>(matrix: &mut [T; 4]) {
+	matrix.swap(0, 1);
+	matrix.swap(2, 3);
 }

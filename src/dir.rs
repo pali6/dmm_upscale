@@ -4,7 +4,7 @@ use std::{convert::TryFrom, fmt::{Display, Formatter}};
 
 use crate::coord::shift_coord;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Dir {
 	North = 1,
 	South = 2,
@@ -92,9 +92,47 @@ impl Dir {
 			Dir::South => Dir::East,
 			Dir::West => Dir::South,
 			Dir::NorthEast => Dir::NorthWest,
+			Dir::SouthEast => Dir::NorthEast,
+			Dir::SouthWest => Dir::SouthEast,
+			Dir::NorthWest => Dir::SouthWest,
+		}
+	}
+
+	pub fn turn(self, amount: i32) -> Dir {
+		let mut dir = self;
+		for _ in 0..((amount % 4 + 4) % 4) {
+			dir = dir.turn_clockwise();
+		}
+		dir
+	}
+
+	pub fn mirror(self) -> Dir {
+		match self {
+			Dir::East => Dir::West,
+			Dir::West => Dir::East,
+			Dir::NorthEast => Dir::NorthWest,
 			Dir::SouthEast => Dir::SouthWest,
 			Dir::SouthWest => Dir::SouthEast,
 			Dir::NorthWest => Dir::NorthEast,
+			x => x,
+		}
+	}
+
+	pub fn mirror_turn(self, do_mirror: bool, amount: i32) -> Dir {
+		if do_mirror {
+			self.mirror().turn(amount)
+		}
+		else {
+			self.turn(amount)
+		}
+	}
+
+	pub fn turn_mirror(self, amount: i32, do_mirror: bool) -> Dir {
+		if do_mirror {
+			self.turn(amount).mirror()
+		}
+		else {
+			self.turn(amount)
 		}
 	}
 
@@ -178,7 +216,7 @@ pub fn pixel_shift_to_cardinal_dir((x, y): (f32, f32)) -> Option<Dir> {
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DirCent {
 	Center = 0,
 	North = 1,
@@ -243,6 +281,22 @@ impl DirCent {
 
 	pub fn turn_counterclockwise(self) -> DirCent {
 		self.to_dir().map(Dir::turn_counterclockwise).map(DirCent::from_dir).unwrap_or(self)
+	}
+
+	pub fn turn(self, amount: i32) -> DirCent {
+		self.to_dir().map(|dir| dir.turn(amount)).map(DirCent::from_dir).unwrap_or(self)
+	}
+
+	pub fn mirror(self) -> DirCent {
+		self.to_dir().map(Dir::mirror).map(DirCent::from_dir).unwrap_or(self)
+	}
+
+	pub fn mirror_turn(self, do_mirror: bool, amount: i32) -> DirCent {
+		self.to_dir().map(|dir| dir.mirror_turn(do_mirror, amount)).map(DirCent::from_dir).unwrap_or(self)
+	}
+
+	pub fn turn_mirror(self, amount: i32, do_mirror: bool) -> DirCent {
+		self.to_dir().map(|dir| dir.turn_mirror(amount, do_mirror)).map(DirCent::from_dir).unwrap_or(self)
 	}
 }
 
