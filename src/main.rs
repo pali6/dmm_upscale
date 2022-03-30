@@ -166,6 +166,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				["obj", "xmastree", ..] |
 				["obj", "landmark", "gps_waypoint", ..] |
 				["obj", "landmark", "map", ..] |
+				["obj", "firedoor_spawn", ..] | // handled in game code
 				["obj", "item", "device", "radio", "beacon", ..] |
 				["obj", "machinery", "navbeacon", ..] => 
 					BIG_TILE_JUST_BOTTOM_LEFT.clone(),
@@ -274,6 +275,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				["obj", "machinery", "flasher", "solitary", ..] |
 				["obj", "item", "storage", "secure", "ssafe", ..] |
 				["obj", "blind_switch", ..] |
+				["obj", "ladder", ..] |
 				["obj", "machinery", "light", "incandescent", "small", ..] |
 				["obj", "machinery", "light", "small", ..] => {
 					get_pixel_shift(prefab, &objtree)
