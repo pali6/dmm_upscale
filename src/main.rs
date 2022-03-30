@@ -233,8 +233,24 @@ fn main() {
 				["obj", "machinery", "recharger", "wall", ..] |
 				["obj", "machinery", "door", "window", ..] |
 				["obj", "machinery", "shower", ..] |
+				["obj", "channel", ..] |
 				["obj", "railing", ..] =>
 					big_tile_two_on_side(dir),
+				["obj", "pool_springboard", ..] => {
+					let dir = match dir {
+						dir::Dir::South => dir::Dir::West,
+						dir::Dir::North => dir::Dir::East,
+						x => x
+					};
+					big_tile_two_on_side(dir)
+				}
+				["obj", "pool", ..] => {
+					let icon_state = get_var(prefab, &objtree, "icon_state").unwrap().as_str().unwrap();
+					match icon_state {
+						"ladder" => big_tile_two_on_side(dir::Dir::South),
+						_ => big_tile_two_on_side(dir.flip()),
+					}
+				}
 				["obj", "item", "storage", "wall", ..] |
 				["obj", "machinery", "networked", "secdetector", ..] |
 				["obj", "machinery", "disposaloutlet", ..] |
