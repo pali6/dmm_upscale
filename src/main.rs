@@ -522,6 +522,28 @@ fn main() {
 				["obj", "machinery", "atmospherics", ..] =>
 					//TODO
 					BIG_TILE_FILL.clone(),
+				["turf", "unsimulated", "wall", "trench", "side", ..] => big_tile_template!(
+					BigTilePart::Source, BigTilePart::Source,
+					BigTilePart::FixedPrefab(Prefab{
+						path: "/turf/space/fluid".to_string(),
+						vars: Default::default(),
+					}),
+					BigTilePart::FixedPrefab(Prefab{
+						path: "/turf/space/fluid".to_string(),
+						vars: Default::default(),
+					})
+				),
+				["turf", "space", "fluid", "warp_z5", "edge", ..] => big_tile_template!(
+					BigTilePart::Source, BigTilePart::Source,
+					BigTilePart::FixedPrefab(Prefab{
+						path: "/turf/space/fluid_warp_z5".to_string(),
+						vars: Default::default(),
+					}),
+					BigTilePart::FixedPrefab(Prefab{
+						path: "/turf/space/fluid/warp_z5".to_string(),
+						vars: Default::default(),
+					})
+				),
 				["obj", "machinery", "power", "pt_laser", ..] |
 				["obj", "machinery", "power", "furnace", ..] => 
 					big_tile_upscale_dynamic(prefab, &objtree),
