@@ -598,6 +598,10 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 					BIG_TILE_FILL.clone(),
 				["turf", "simulated", "wall", "auto", "shuttle", ..] =>
 					BIG_TILE_UPSCALE_TURF.clone(),
+				["obj", "decal", "tile_edge", ..] => {
+					mut_prefab.vars.insert("merge_with_turf".to_string(), Constant::Float(0.));
+					big_tile_upscale_dynamic(&mut_prefab, &objtree)
+				}
 				["obj", "machinery", ..] |
 				["obj", "shrub", ..] |
 				["obj", "submachine", ..] |
