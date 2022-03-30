@@ -565,6 +565,7 @@ fn main() {
 				["obj", "kitchenspike", ..] |
 				["obj", "juggleplaque", ..] |
 				["obj", "item", "instrument", "large", ..] |
+				["obj", "monkeyplant", ..] |
 				["obj", "player_piano", ..] => {
 					let anchored = get_var(prefab, &objtree, "anchored").and_then(Constant::to_float).unwrap_or(1.) != 0.;
 					let dense = get_var(prefab, &objtree, "density").and_then(Constant::to_float).unwrap_or(1.) != 0.;
