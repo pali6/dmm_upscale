@@ -262,6 +262,7 @@ fn main() {
 				["obj", "machinery", "recharger", "wall", ..] |
 				["obj", "machinery", "door", "window", ..] |
 				["obj", "machinery", "shower", ..] |
+				["obj", "disposalpipe", "broken", ..] |
 				["obj", "channel", ..] |
 				["obj", "railing", ..] =>
 					big_tile_two_on_side(dir),
