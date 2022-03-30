@@ -111,20 +111,27 @@ fn main() {
 	};
 
 	for path in paths {
+		let map_name = path.file_stem().unwrap().to_str().unwrap();
 		let out_filename = format!(
 			"{}_big.{}",
-			path.file_stem().unwrap().to_str().unwrap(),
+			map_name,
 			path.extension().unwrap().to_str().unwrap()
 		);
+		println!("loading map {} from {}", map_name, path.display());
 		let output_path = path.parent().unwrap().join(out_filename);
 		let map = dmm::Map::from_file(&path);
-		let map = map.unwrap();
+		let map = if let Ok(x) = map {
+			x
+		} else {
+			println!("failed to load map {}", path.display());
+			continue;
+		};
 		
-		println!("starting map {}", path.display());
+		println!("upscaling map {}", map_name);
 		let out_map = upscale_map(&map, &objtree);
-		println!("map finished");
+		println!("finished map {}", map_name);
 		out_map.to_file(&output_path).unwrap();
-		println!("saved map {}", output_path.display());
+		println!("saved map {} as {}", map_name, output_path.display());
 	}
 
 	println!("done");
