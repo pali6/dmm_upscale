@@ -163,11 +163,15 @@ pub fn big_tile_upscale_dynamic(prefab: &Prefab, objtree: &ObjectTree) -> BigTil
 	let bound_height = get_var(prefab, objtree, "bound_height").and_then(Constant::to_float).unwrap_or(TILE_SIZE);
 	let pixel_x = get_var(prefab, objtree, "pixel_x").and_then(Constant::to_float).unwrap_or(0.);
 	let pixel_y = get_var(prefab, objtree, "pixel_y").and_then(Constant::to_float).unwrap_or(0.);
+	let bound_x = get_var(prefab, objtree, "bound_x").and_then(Constant::to_float).unwrap_or(0.);
+	let bound_y = get_var(prefab, objtree, "bound_y").and_then(Constant::to_float).unwrap_or(0.);
 	big_tile_template!(
 		Empty, Empty,
 		big_tile_modification!(
 			"bound_width" => Constant::Float(2. * bound_width),
 			"bound_height" => Constant::Float(2. * bound_height),
+			"bound_x" => Constant::Float(2. * bound_x),
+			"bound_y" => Constant::Float(2. * bound_y),
 			"pixel_x" => Constant::Float(2. * pixel_x),
 			"pixel_y" => Constant::Float(2. * pixel_y),
 			"transform" => Constant::List(Box::new([
