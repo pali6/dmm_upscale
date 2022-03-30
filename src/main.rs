@@ -171,11 +171,14 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 					BIG_TILE_JUST_BOTTOM_LEFT.clone(),
 				["obj", "decal", "fakeobjects", "airmonitor_broken", ..] |
 				["obj", "machinery", "sparker", ..] |
-				["obj", "machinery", "light_switch", "auto", ..] => {
+				["obj", "machinery", "light_switch", "auto", ..] =>
 					solid_neigh
 					.and_then(|x| Some(big_tile_two_on_side(x)))
-					.unwrap_or(BIG_TILE_FILL.clone())
-				}
+					.unwrap_or(BIG_TILE_FILL.clone()),
+				["obj", "machinery", "light", ..] if get_var(prefab, &objtree, "nostick").and_then(Constant::to_float).unwrap_or(1.) == 0. =>
+					solid_neigh
+					.and_then(|x| Some(big_tile_two_on_side(x)))
+					.unwrap_or(BIG_TILE_FILL.clone()),
 				["obj", "airbridge_controller", ..] => {
 					let tunnel_width = get_var(prefab, &objtree, "tunnel_width")
 						.and_then(Constant::to_float)
