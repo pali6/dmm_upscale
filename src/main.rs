@@ -328,7 +328,7 @@ fn main() {
 					let filtered_subpath = subpath.iter().filter(|&&x| !["north", "south", "east", "west"].contains(&x)).map(|x| *x).collect::<Vec<_>>();
 					let mut straight_pipe = prefab.clone();
 					straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
-
+					straight_pipe.vars.insert("dir".to_string(), dir.to_constant());
 					match dir {
 						Dir::North => big_tile_template!(
 							BigTilePart::FixedPrefab(straight_pipe.clone()), BigTilePart::FixedPrefab(straight_pipe),
