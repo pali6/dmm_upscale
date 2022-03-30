@@ -112,7 +112,7 @@ fn main() {
 				prefab.path.starts_with("/obj/machinery/door")
 			);
 			let dir = get_var(prefab, &objtree, "dir")
-				.and_then(|x| dir::Dir::try_from(x).ok())
+				.and_then(|x| Dir::try_from(x).ok())
 				.unwrap_or(Dir::South);
 
 			let big_tile: BigTileTemplate = match path {
@@ -142,7 +142,7 @@ fn main() {
 					.unwrap_or(BIG_TILE_FILL.clone())
 				}
 				["obj", "machinery", "drone_recharger", ..] => 
-					big_tile_two_on_side(dir::Dir::North),
+					big_tile_two_on_side(Dir::North),
 				["obj", "stool", "chair", "couch", ..] => {
 					match dir {
 						Dir::North | Dir::South => big_tile_two_on_side(Dir::North),
@@ -153,6 +153,35 @@ fn main() {
 						Dir::West => big_tile_template!(
 							BigTilePart::Source, big_tile_modification!("dir" => Constant::Float(2.)),
 							BigTilePart::Empty, BigTilePart::Empty
+						),
+						_ => BIG_TILE_FILL.clone(),
+					}
+				}
+				["obj", "stool", "chair", "boxingrope_corner", ..] => {
+					let rope_down = Prefab{
+						path: "/obj/decal/boxingrope".to_string(),
+						vars: Default::default(),
+					};
+					let mut rope_left = rope_down.clone();
+					rope_left.vars.insert("dir".to_string(), Dir::West.to_constant());
+					let mut rope_right = rope_down.clone();
+					rope_right.vars.insert("dir".to_string(), Dir::East.to_constant());
+					match dir {
+						Dir::NorthEast => big_tile_template!(
+							BigTilePart::Empty, BigTilePart::Empty,
+							BigTilePart::FixedPrefab(rope_down), BigTilePart::Source
+						),
+						Dir::NorthWest => big_tile_template!(
+							BigTilePart::Empty, BigTilePart::Empty,
+							BigTilePart::Source, BigTilePart::FixedPrefab(rope_down)
+						),
+						Dir::SouthEast => big_tile_template!(
+							BigTilePart::Empty, BigTilePart::FixedPrefab(rope_right),
+							BigTilePart::FixedPrefab(rope_down), BigTilePart::Source
+						),
+						Dir::SouthWest => big_tile_template!(
+							BigTilePart::FixedPrefab(rope_left), BigTilePart::Empty,
+							BigTilePart::Source, BigTilePart::FixedPrefab(rope_down)
 						),
 						_ => BIG_TILE_FILL.clone(),
 					}
@@ -238,8 +267,8 @@ fn main() {
 					big_tile_two_on_side(dir),
 				["obj", "pool_springboard", ..] => {
 					let dir = match dir {
-						dir::Dir::South => dir::Dir::West,
-						dir::Dir::North => dir::Dir::East,
+						Dir::South => Dir::West,
+						Dir::North => Dir::East,
 						x => x
 					};
 					big_tile_two_on_side(dir)
@@ -247,7 +276,7 @@ fn main() {
 				["obj", "pool", ..] => {
 					let icon_state = get_var(prefab, &objtree, "icon_state").unwrap().as_str().unwrap();
 					match icon_state {
-						"ladder" => big_tile_two_on_side(dir::Dir::South),
+						"ladder" => big_tile_two_on_side(Dir::South),
 						_ => big_tile_two_on_side(dir.flip()),
 					}
 				}
@@ -257,14 +286,14 @@ fn main() {
 				["obj", "submachine", "chef_sink", ..] => 
 					big_tile_two_on_side(dir.flip()),
 				["obj", "machinery", "ghostdrone_factory", ..] =>
-					big_tile_one_on_side(dir::Dir::East),
+					big_tile_one_on_side(Dir::East),
 				/*
 				["obj", "decal", "cleanable", "cobweb", ..] |
 				["obj", "decal", "cleanable", "cobweb2", ..] => {
 					// TODO: scale up?
 					match get_var(prefab, &objtree, "icon_state") {
-						Some(Constant::String(s)) if **s == *"cobweb1" => big_tile_one_on_side(dir::Dir::NorthWest),
-						Some(Constant::String(s)) if **s == *"cobweb2" => big_tile_one_on_side(dir::Dir::NorthEast),
+						Some(Constant::String(s)) if **s == *"cobweb1" => big_tile_one_on_side(Dir::NorthWest),
+						Some(Constant::String(s)) if **s == *"cobweb2" => big_tile_one_on_side(Dir::NorthEast),
 						_ => BIG_TILE_FILL.clone(),
 					}
 				},
