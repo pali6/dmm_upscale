@@ -8,6 +8,7 @@ mod coord;
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::path::Path;
 use std::str;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -85,14 +86,51 @@ fn build_path(path: &str, subpath: &[&str]) -> String {
 
 fn main() {
 	println!("begin");
-	let map = dmm::Map::from_file(r"..\..\goonstation\maps\cogmap.dmm".as_ref());
-	let map = map.unwrap();
 	
 	let objtree = Context::default().parse_environment(r"..\..\goonstation\goonstation.dme".as_ref());
 	let objtree = objtree.unwrap();
-	//let objtree = ObjectTree::default();
 	println!("environment parsed");
 
+	let path = Path::new(r"..\..\goonstation\maps");
+	let paths = if path.is_dir() {
+		let mut paths_result = vec![];
+		for subpath in std::fs::read_dir(path).unwrap() {
+			if !subpath.is_ok() {
+				continue;
+			}
+			let path = subpath.unwrap().path();
+			if path.is_file()
+					&& path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("") == "dmm"
+					&& !path.file_stem().unwrap().to_str().unwrap().ends_with("_big") {
+				paths_result.push(path);
+			}
+		}
+		paths_result
+	} else {
+		vec![path.into()]
+	};
+
+	for path in paths {
+		let out_filename = format!(
+			"{}_big.{}",
+			path.file_stem().unwrap().to_str().unwrap(),
+			path.extension().unwrap().to_str().unwrap()
+		);
+		let output_path = path.parent().unwrap().join(out_filename);
+		let map = dmm::Map::from_file(&path);
+		let map = map.unwrap();
+		
+		println!("starting map {}", path.display());
+		let out_map = upscale_map(&map, &objtree);
+		println!("map finished");
+		out_map.to_file(&output_path).unwrap();
+		println!("saved map {}", output_path.display());
+	}
+
+	println!("done");
+}
+
+pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 	let (width, height, z_level_count) = map.dim_xyz();
 	assert!(z_level_count == 1); // TODO
 
@@ -120,7 +158,6 @@ fn main() {
 					BIG_TILE_FILL.clone(),
 				["obj", "xmastree", ..] |
 				["obj", "landmark", "gps_waypoint", ..] |
-				["obj", "machinery", "networked", "mainframe", ..] |
 				["obj", "landmark", "map", ..] |
 				["obj", "item", "device", "radio", "beacon", ..] |
 				["obj", "machinery", "navbeacon", ..] => 
@@ -147,11 +184,11 @@ fn main() {
 					match dir {
 						Dir::North | Dir::South => big_tile_two_on_side(Dir::North),
 						Dir::East => big_tile_template!(
-							big_tile_modification!("dir" => Constant::Float(2.)), BigTilePart::Source,
+							big_tile_modification!("dir" => Dir::South.to_constant()), BigTilePart::Source,
 							BigTilePart::Empty, BigTilePart::Empty
 						),
 						Dir::West => big_tile_template!(
-							BigTilePart::Source, big_tile_modification!("dir" => Constant::Float(2.)),
+							BigTilePart::Source, big_tile_modification!("dir" => Dir::South.to_constant()),
 							BigTilePart::Empty, BigTilePart::Empty
 						),
 						_ => BIG_TILE_FILL.clone(),
@@ -234,7 +271,7 @@ fn main() {
 						.or(Some(dir))
 						.and_then(|x| Some(big_tile_two_on_side(x)))
 						.unwrap_or(BIG_TILE_FILL.clone())
-				}, |
+				},
 				["obj", "window", ..] if !dir.is_cardinal() => {
 					BIG_TILE_FILL.clone()
 				}
@@ -288,17 +325,6 @@ fn main() {
 					big_tile_two_on_side(dir.flip()),
 				["obj", "machinery", "ghostdrone_factory", ..] =>
 					big_tile_one_on_side(Dir::East),
-				/*
-				["obj", "decal", "cleanable", "cobweb", ..] |
-				["obj", "decal", "cleanable", "cobweb2", ..] => {
-					// TODO: scale up?
-					match get_var(prefab, &objtree, "icon_state") {
-						Some(Constant::String(s)) if **s == *"cobweb1" => big_tile_one_on_side(Dir::NorthWest),
-						Some(Constant::String(s)) if **s == *"cobweb2" => big_tile_one_on_side(Dir::NorthEast),
-						_ => BIG_TILE_FILL.clone(),
-					}
-				},
-				*/
 				["obj", "machinery", "vehicle", "pod_smooth", ..] => {
 					place_with_shift_scale(&mut out_map, &mut_prefab, coord.xy(), (2, 2));
 					BIG_TILE_EMPTY.clone()
@@ -425,6 +451,8 @@ fn main() {
 						_ => BIG_TILE_FILL.clone()
 					}
 				}
+
+				// ATMOS PIPES
 				["obj", "machinery", "atmospherics", "pipe", "simple", "junction", ..] |
 				["obj", "machinery", "atmospherics", "valve", ..] |
 				["obj", "machinery", "atmospherics", "binary", ..] => {
@@ -520,8 +548,8 @@ fn main() {
 					}
 				}
 				["obj", "machinery", "atmospherics", ..] =>
-					//TODO
 					BIG_TILE_FILL.clone(),
+
 				["turf", "unsimulated", "wall", "trench", "side", ..] => big_tile_template!(
 					BigTilePart::Source, BigTilePart::Source,
 					BigTilePart::FixedPrefab(Prefab{
@@ -555,7 +583,7 @@ fn main() {
 				["obj", "machinery", "networked", "telepad", ..] |
 				["obj", "machinery", "turret", ..] |
 				["obj", "submachine", "chicken_incubator", ..] |
-				["obj", "machinery", "cargo_router", ..] | // TODO
+				["obj", "machinery", "cargo_router", ..] |
 				["obj", "machinery", "power", ..] =>
 					BIG_TILE_FILL.clone(),
 				["turf", "simulated", "wall", "auto", "shuttle", ..] =>
@@ -604,8 +632,5 @@ fn main() {
 	}
 	println!("tiles placed");
 
-	let out_map = out_map.finish().unwrap();
-	println!("map finished");
-	out_map.to_file("cogmap_big.dmm".as_ref()).unwrap();
-	println!("map saved");
+	out_map.finish().unwrap()
 }
