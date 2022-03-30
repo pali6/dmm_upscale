@@ -574,7 +574,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				["turf", "space", "fluid", "warp_z5", "edge", ..] => big_tile_template!(
 					BigTilePart::Source, BigTilePart::Source,
 					BigTilePart::FixedPrefab(Prefab{
-						path: "/turf/space/fluid_warp_z5".to_string(),
+						path: "/turf/space/fluid/warp_z5".to_string(),
 						vars: Default::default(),
 					}),
 					BigTilePart::FixedPrefab(Prefab{
