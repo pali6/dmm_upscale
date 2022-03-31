@@ -91,24 +91,37 @@ fn main() {
 	let objtree = objtree.unwrap();
 	println!("environment parsed");
 
-	let path = Path::new(r"..\..\goonstation\maps");
-	let paths = if path.is_dir() {
-		let mut paths_result = vec![];
-		for subpath in std::fs::read_dir(path).unwrap() {
-			if !subpath.is_ok() {
-				continue;
+	let input_paths = [
+		Path::new(r"..\..\goonstation\maps"),
+		Path::new(r"..\..\goonstation\+secret\maps"),
+		Path::new(r"..\..\goonstation\assets\maps\shuttles\east"),
+		Path::new(r"..\..\goonstation\assets\maps\shuttles\west"),
+		Path::new(r"..\..\goonstation\assets\maps\shuttles\south"),
+		Path::new(r"..\..\goonstation\assets\maps\shuttles\north"),
+		Path::new(r"..\..\goonstation\assets\maps\transit\east"),
+		Path::new(r"..\..\goonstation\assets\maps\transit\west"),
+		Path::new(r"..\..\goonstation\assets\maps\transit\south"),
+		Path::new(r"..\..\goonstation\assets\maps\transit\north"),
+	];
+
+	let mut paths: Vec<std::path::PathBuf> = Vec::new();
+	for path in input_paths {
+		if path.is_dir() {
+			for subpath in std::fs::read_dir(path).unwrap() {
+				if !subpath.is_ok() {
+					continue;
+				}
+				let path = subpath.unwrap().path();
+				if path.is_file()
+						&& path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("") == "dmm"
+						&& !path.file_stem().unwrap().to_str().unwrap().ends_with("_big") {
+					paths.push(path);
+				}
 			}
-			let path = subpath.unwrap().path();
-			if path.is_file()
-					&& path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("") == "dmm"
-					&& !path.file_stem().unwrap().to_str().unwrap().ends_with("_big") {
-				paths_result.push(path);
-			}
+		} else {
+			paths.push(path.into());
 		}
-		paths_result
-	} else {
-		vec![path.into()]
-	};
+	}
 
 	for path in paths {
 		let map_name = path.file_stem().unwrap().to_str().unwrap();
@@ -120,11 +133,12 @@ fn main() {
 		println!("loading map {} from {}", map_name, path.display());
 		let output_path = path.parent().unwrap().join(out_filename);
 		let map = dmm::Map::from_file(&path);
-		let map = if let Ok(x) = map {
-			x
-		} else {
-			println!("failed to load map {}", path.display());
-			continue;
+		let map = match map {
+			Ok(map) => map,
+			Err(err)=> {
+				println!("failed to load map {}\n{}", path.display(), err);
+				continue;
+			}
 		};
 		
 		println!("upscaling map {}", map_name);
@@ -159,6 +173,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 			let dir = get_var(prefab, &objtree, "dir")
 				.and_then(|x| Dir::try_from(x).ok())
 				.unwrap_or(Dir::South);
+			let name = get_var(prefab, &objtree, "name").and_then(Constant::as_str).unwrap_or("");
 
 			let big_tile: BigTileTemplate = match path {
 				["obj", "machinery", "light", "small", "floor", ..] => 
@@ -166,9 +181,12 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				["obj", "xmastree", ..] |
 				["obj", "landmark", "gps_waypoint", ..] |
 				["obj", "landmark", "map", ..] |
+				["obj", "marker", ..] |
 				["obj", "firedoor_spawn", ..] | // handled in game code
 				["obj", "item", "device", "radio", "beacon", ..] |
 				["obj", "machinery", "navbeacon", ..] => 
+					BIG_TILE_JUST_BOTTOM_LEFT.clone(),
+				["obj", "landmark", ..] if ["shuttle-centcom", "shuttle-transit"].contains(&name) =>
 					BIG_TILE_JUST_BOTTOM_LEFT.clone(),
 				["obj", "decal", "fakeobjects", "airmonitor_broken", ..] |
 				["obj", "machinery", "sparker", ..] |
@@ -276,6 +294,8 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				["obj", "item", "storage", "secure", "ssafe", ..] |
 				["obj", "blind_switch", ..] |
 				["obj", "ladder", ..] |
+				["obj", "health_scanner", "wall", ..] |
+				["obj", "decal", "cleanable", "gangtag", ..] |
 				["obj", "machinery", "light", "incandescent", "small", ..] |
 				["obj", "machinery", "light", "small", ..] => {
 					get_pixel_shift(prefab, &objtree)
@@ -332,11 +352,12 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				}
 				["obj", "item", "storage", "wall", ..] |
 				["obj", "machinery", "networked", "secdetector", ..] |
-				["obj", "machinery", "disposaloutlet", ..] |
-				["obj", "submachine", "chef_sink", ..] => 
+				// ["obj", "submachine", "chef_sink", ..] |
+				["obj", "machinery", "disposaloutlet", ..] => 
 					big_tile_two_on_side(dir.flip()),
 				["obj", "machinery", "ghostdrone_factory", ..] =>
 					big_tile_one_on_side(Dir::East),
+				["obj", "random_pod_spawner", ..] |
 				["obj", "machinery", "vehicle", "pod_smooth", ..] => {
 					place_with_shift_scale(&mut out_map, &mut_prefab, coord.xy(), (2, 2));
 					BIG_TILE_EMPTY.clone()
@@ -464,6 +485,50 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 					}
 				}
 
+				// TEG
+				["obj", "machinery", "atmospherics", "binary", "circulatorTemp", rest @ ..] => {
+					let mut pipe = Prefab{
+						path: "/obj/machinery/atmospherics/pipe/simple".to_string(),
+						vars: Default::default(),
+					};
+					pipe.vars.insert("level".to_string(), Constant::Float(2.));
+					let connector = Prefab{
+						path: "/obj/machinery/teg_connector/random_appearance".to_string(),
+						vars: Default::default(),
+					};
+
+					if let Some(&"right") = rest.get(0) {
+						BigTileTemplate{
+							parts: [
+								vec![BigTilePart::Source], 
+								vec![BigTilePart::FixedPrefab(pipe.clone())],
+								vec![BigTilePart::FixedPrefab(pipe), BigTilePart::FixedPrefab(connector)],
+								vec![BigTilePart::Source],
+							]
+						}
+					}
+					else {
+						BigTileTemplate{
+							parts: [
+								vec![BigTilePart::Source], 
+								vec![BigTilePart::FixedPrefab(pipe.clone()), BigTilePart::FixedPrefab(connector)],
+								vec![BigTilePart::FixedPrefab(pipe)],
+								vec![BigTilePart::Source],
+							]
+						}
+					}
+				}
+				["obj", "machinery", "power", "generatorTemp", ..] => {
+						let connector = Prefab{
+							path: "/obj/machinery/teg_connector/random_appearance".to_string(),
+							vars: Default::default(),
+						};
+						big_tile_template!(
+							BigTilePart::Source, BigTilePart::FixedPrefab(connector.clone()),
+							BigTilePart::FixedPrefab(connector), BigTilePart::Source
+						)
+				}
+
 				// ATMOS PIPES
 				["obj", "machinery", "atmospherics", "pipe", "simple", "junction", ..] |
 				["obj", "machinery", "atmospherics", "valve", ..] |
@@ -472,7 +537,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 						path: "/obj/machinery/atmospherics/pipe/simple".to_string(),
 						vars: Default::default(),
 					};
-					straight_pipe.vars.insert("level".to_string(), Constant::Float(2.));
+					straight_pipe.vars.insert("level".to_string(), get_var(prefab, &objtree, "level").unwrap().clone());
 					straight_pipe.vars.insert("dir".to_string(), dir.to_constant());
 					match dir {
 						Dir::North => big_tile_template!(
@@ -526,7 +591,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 						path: "/obj/machinery/atmospherics/pipe/simple".to_string(),
 						vars: Default::default(),
 					};
-					down_pipe.vars.insert("level".to_string(), Constant::Float(2.));
+					down_pipe.vars.insert("level".to_string(), get_var(prefab, &objtree, "level").unwrap().clone());
 					down_pipe.vars.insert("dir".to_string(), down_dir.to_constant());
 					let mut side_pipe = down_pipe.clone();
 					side_pipe.vars.insert("dir".to_string(), down_dir.turn_clockwise().to_constant());
@@ -596,9 +661,10 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				["obj", "machinery", "turret", ..] |
 				["obj", "submachine", "chicken_incubator", ..] |
 				["obj", "machinery", "cargo_router", ..] |
+				["obj", "machinery", "plantpot", ..] |
 				["obj", "machinery", "power", ..] =>
 					BIG_TILE_FILL.clone(),
-				["turf", "simulated", "wall", "auto", "shuttle", ..] =>
+				["turf", "simulated", "shuttle", "wall", "cockpit"] =>
 					BIG_TILE_UPSCALE_TURF.clone(),
 				["obj", "decal", "tile_edge", ..] => {
 					mut_prefab.vars.insert("merge_with_turf".to_string(), Constant::Float(0.));
@@ -632,7 +698,15 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 				["obj", "juggleplaque", ..] |
 				["obj", "item", "instrument", "large", ..] |
 				["obj", "monkeyplant", ..] |
+				["obj", "npc", "trader", ..] |
+				["obj", "critter", ..] |
+				["obj", "stove", ..] |
+				["obj", "admin_plaque", ..] |
+				["obj", "decoration", ..] |
+				["obj", "health_scanner", "floor", ..] |
 				["obj", "player_piano", ..] => {
+					big_tile_upscale_dynamic(prefab, &objtree)
+					/*
 					let anchored = get_var(prefab, &objtree, "anchored").and_then(Constant::to_float).unwrap_or(1.) != 0.;
 					let dense = get_var(prefab, &objtree, "density").and_then(Constant::to_float).unwrap_or(1.) != 0.;
 					if anchored || !dense {
@@ -640,6 +714,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 					} else {
 						BIG_TILE_FILL.clone()
 					}
+					*/
 				}
 				_ => BIG_TILE_FILL.clone(),
 			};

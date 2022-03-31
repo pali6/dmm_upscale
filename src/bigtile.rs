@@ -153,7 +153,7 @@ lazy_static! {
 				(Constant::Float(2.), None),
 				(Constant::Float(TILE_SIZE / 2.), None),
 			])),
-			"layer" => Constant::Float(2.1)
+			"layer" => Constant::Float(420.)
 		), Source
 	);
 }
