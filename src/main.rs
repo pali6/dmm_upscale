@@ -416,6 +416,7 @@ pub fn upscale_map(map: &Map, objtree: &ObjectTree) -> Map {
 							let mut straight_pipe = prefab.clone();
 							straight_pipe.path = build_path("/obj/disposalpipe/segment", filtered_subpath.as_slice());
 							straight_pipe.vars.insert("icon_state".to_string(), Constant::string("pipe-s"));
+							straight_pipe.vars.insert("dir".to_string(), dir.to_constant());
 							let mut straight_pipe_side = straight_pipe.clone();
 							straight_pipe_side.vars.insert("dir".to_string(), dir.turn_clockwise().to_constant());
 							match dir {
