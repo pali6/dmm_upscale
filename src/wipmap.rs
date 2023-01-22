@@ -78,7 +78,16 @@ fn normalize_tile(tile: &mut Vec<Prefab>) {
 		p.vars.sort_keys();
 	}
 	tile.sort_by_key(|p| {
-		format!("{:?}, {:?}", p.path, p.vars)
+		// make sure that areas are last and turfs before that because that's what TGM wants
+		let atom_spec = 
+			if p.path.starts_with("/area") {
+				2
+			} else if p.path.starts_with("/turf") {
+				1
+			} else {
+				0
+			};
+		format!("{:?} {:?}, {:?}", atom_spec, p.path, p.vars)
 	});
 	tile.dedup_by_key(|p| {
 		format!("{:?}, {:?}", p.path, p.vars)
